@@ -1,61 +1,58 @@
 import React from 'react';
 
-export default function SettingsModal({ isOpen, onClose, theme, setTheme, lang, setLang, texts }) {
-  if (!isOpen) {
-    return null;
-  }
+export default function SettingsModal({ isOpen, onClose, theme, setTheme, lang, setLang, texts, projectData, setProjectData }) {
+  if (!isOpen) return null;
 
-  const handleThemeChange = (newTheme) => {
-    setTheme(newTheme);
-  };
-
-  const handleLangChange = (newLang) => {
-    setLang(newLang);
+  const handleStandardChange = (e) => {
+    setProjectData(pd => ({...pd, standard: e.target.value}));
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <button className="modal-close-btn" onClick={onClose}>&times;</button>
-        <h2>{texts.settings_title || 'Paramètres'}</h2>
-
-        {/* --- Section Thème --- */}
-        <div className="settings-section">
-          <label>{texts.theme_label || 'Thème'}</label>
-          <div className="settings-options">
-            <button 
-              onClick={() => handleThemeChange('light')}
-              className={theme === 'light' ? 'active' : ''}
-            >
-              ☀️ {texts.theme_light || 'Clair'}
-            </button>
-            <button 
-              onClick={() => handleThemeChange('dark')}
-              className={theme === 'dark' ? 'active' : ''}
-            >
-              🌙 {texts.theme_dark || 'Sombre'}
-            </button>
-          </div>
+    <div 
+      style={{ 
+        position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', 
+        background: 'rgba(0,0,0,0.5)', display: 'flex', 
+        justifyContent: 'center', alignItems: 'center', zIndex: 1000 
+      }}
+      onClick={onClose}
+    >
+      <div 
+        style={{ 
+          background: 'var(--sidebar-bg)', padding: '30px', borderRadius: '8px', 
+          width: '400px', boxShadow: '0 5px 15px rgba(0,0,0,0.3)',
+          border: '1px solid var(--sidebar-border)'
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 style={{ marginTop: 0, marginBottom: '25px', color: 'var(--text-color)' }}>{texts.settings_title}</h2>
+        
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-color)', fontSize: '14px' }}>{texts.theme_label}</label>
+          <select value={theme} onChange={e => setTheme(e.target.value)} style={{ width: '100%', padding: '8px' }}>
+            <option value="light">{texts.theme_light}</option>
+            <option value="dark">{texts.theme_dark}</option>
+          </select>
         </div>
 
-        {/* --- Section Langue --- */}
-        <div className="settings-section">
-          <label>{texts.language_label || 'Langue'}</label>
-          <div className="settings-options">
-            <button 
-              onClick={() => handleLangChange('fr')}
-              className={lang === 'fr' ? 'active' : ''}
-            >
-              FR
-            </button>
-            <button 
-              onClick={() => handleLangChange('en')}
-              className={lang === 'en' ? 'active' : ''}
-            >
-              EN
-            </button>
-          </div>
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-color)', fontSize: '14px' }}>{texts.language_label}</label>
+          <select value={lang} onChange={e => setLang(e.target.value)} style={{ width: '100%', padding: '8px' }}>
+            <option value="fr">Français</option>
+            <option value="en">English</option>
+          </select>
         </div>
+
+        <div style={{ marginBottom: '25px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-color)', fontSize: '14px' }}>Norme électrique</label>
+          <select value={projectData.standard || 'be'} onChange={handleStandardChange} style={{ width: '100%', padding: '8px' }}>
+            <option value="be">Belgique (RGIE/AREI)</option>
+            <option value="fr">France (NF C 15-100)</option>
+          </select>
+        </div>
+
+        <button onClick={onClose} style={{ width: '100%', padding: '10px', background: 'var(--button-primary-bg)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+          Fermer
+        </button>
       </div>
     </div>
   );

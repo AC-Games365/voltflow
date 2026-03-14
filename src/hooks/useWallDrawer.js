@@ -1,14 +1,16 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useReactFlow } from 'reactflow';
 
-const getId = () => `dndnode_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+const getId = () => `wall_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
 export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes, takeSnapshot, texts }) => {
   const [wallStartPoint, setWallStartPoint] = useState(null);
   const [currentPath, setCurrentPath] = useState([]);
   const { screenToFlowPosition } = useReactFlow();
 
-  // Nettoyer l'aperçu si on quitte le mode dessin
+  const SNAP_GRID = 15;
+  const SNAP_RADIUS = 20;
+
   useEffect(() => {
     if (!isDrawingWall) {
       setWallStartPoint(null);
@@ -17,122 +19,121 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
     }
   }, [isDrawingWall, setNodes]);
 
-  // Clic pour commencer ou valider un mur
+  const getPoint = useCallback((rawPos) => {
+    let point = {
+      x: Math.round(rawPos.x / SNAP_GRID) * SNAP_GRID,
+      y: Math.round(rawPos.y / SNAP_GRID) * SNAP_GRID
+    };
+
+    nodes.forEach(node => {
+      if (node.type === 'wall' && node.id !== 'wall_preview') {
+        const endpoints = [
+          { x: node.position.x, y: node.position.y },
+          { x: node.position.x + (node.style.width || 0), y: node.position.y + (node.style.height || 0) }
+        ];
+        endpoints.forEach(ep => {
+          const dist = Math.sqrt(Math.pow(rawPos.x - ep.x, 2) + Math.pow(rawPos.y - ep.y, 2));
+          if (dist < SNAP_RADIUS) {
+            point = { x: ep.x, y: ep.y };
+          }
+        });
+      }
+    });
+    return point;
+  }, [nodes]);
+
   const onPaneClick = useCallback((event) => {
     if (!isDrawingWall) return;
-    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-    const snap = 15;
-    const snappedPos = { x: Math.round(position.x / snap) * snap, y: Math.round(position.y / snap) * snap };
+    
+    const rawPos = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+    const currentPoint = getPoint(rawPos);
 
     if (!wallStartPoint) {
-      setWallStartPoint(snappedPos);
-      setCurrentPath([snappedPos]);
+      setWallStartPoint(currentPoint);
+      setCurrentPath([currentPoint]);
     } else {
-      const dx = snappedPos.x - wallStartPoint.x;
-      const dy = snappedPos.y - wallStartPoint.y;
-      if (dx === 0 && dy === 0) return;
+      const dx = Math.abs(currentPoint.x - wallStartPoint.x);
+      const dy = Math.abs(currentPoint.y - wallStartPoint.y);
+      
+      if (dx < 5 && dy < 5) return;
 
       takeSnapshot();
 
-      const isHorizontal = Math.abs(dx) > Math.abs(dy);
-      let actualNextPoint = isHorizontal 
-        ? { x: snappedPos.x, y: wallStartPoint.y } 
-        : { x: wallStartPoint.x, y: snappedPos.y };
+      const isHorizontal = dx > dy;
+      const endPoint = isHorizontal 
+        ? { x: currentPoint.x, y: wallStartPoint.y } 
+        : { x: wallStartPoint.x, y: currentPoint.y };
 
-      let isClosed = false;
-      if (currentPath.length >= 3) {
-        const startX = currentPath[0].x;
-        const startY = currentPath[0].y;
-        if (isHorizontal && wallStartPoint.y === startY && ((startX >= wallStartPoint.x && startX <= actualNextPoint.x) || (startX <= wallStartPoint.x && startX >= actualNextPoint.x))) {
-          isClosed = true;
-          actualNextPoint.x = startX;
-        } else if (!isHorizontal && wallStartPoint.x === startX && ((startY >= wallStartPoint.y && startY <= actualNextPoint.y) || (startY <= wallStartPoint.y && startY >= actualNextPoint.y))) {
-          isClosed = true;
-          actualNextPoint.y = startY;
-        }
-      }
-
-      let width = 15, height = 15, x = 0, y = 0;
-      if (isHorizontal) {
-        width = Math.max(Math.abs(actualNextPoint.x - wallStartPoint.x) + 15, 15);
-        x = Math.min(wallStartPoint.x, actualNextPoint.x) - 7.5;
-        y = wallStartPoint.y - 7.5;
-      } else {
-        height = Math.max(Math.abs(actualNextPoint.y - wallStartPoint.y) + 15, 15);
-        x = wallStartPoint.x - 7.5;
-        y = Math.min(wallStartPoint.y, actualNextPoint.y) - 7.5;
-      }
+      const width = isHorizontal ? Math.abs(endPoint.x - wallStartPoint.x) : 15;
+      const height = isHorizontal ? 15 : Math.abs(endPoint.y - wallStartPoint.y);
+      const x = Math.min(wallStartPoint.x, endPoint.x);
+      const y = Math.min(wallStartPoint.y, endPoint.y);
 
       const newWall = {
-        id: getId(), type: 'wall', position: { x, y },
-        data: { label: '', color: '#333333', width, height },
-        style: { width, height },
+        id: getId(),
+        type: 'wall',
+        position: { x, y },
+        data: { label: '' },
+        style: { width, height, backgroundColor: '#333' },
       };
 
-      const isDuplicate = nodes.some(n => n.type === 'wall' && n.position.x === x && n.position.y === y && n.style.width === width && n.style.height === height);
-
-      if (isClosed) {
-        const finalPath = [...currentPath, actualNextPoint];
+      const startOfPath = currentPath[0];
+      const distToStart = Math.sqrt(Math.pow(endPoint.x - startOfPath.x, 2) + Math.pow(endPoint.y - startOfPath.y, 2));
+      
+      if (currentPath.length >= 3 && distToStart < SNAP_RADIUS) {
+        const finalPath = [...currentPath, startOfPath];
         const minX = Math.min(...finalPath.map(p => p.x));
         const maxX = Math.max(...finalPath.map(p => p.x));
         const minY = Math.min(...finalPath.map(p => p.y));
         const maxY = Math.max(...finalPath.map(p => p.y));
-        
+
         const roomNode = {
-          id: getId(), type: 'room', position: { x: minX + 7.5, y: minY + 7.5 },
-          data: { label: texts.new_room || 'Nouvelle Pièce', color: '#009688', rotation: 0 },
-          style: { width: Math.max(15, (maxX - minX) - 15), height: Math.max(15, (maxY - minY) - 15), zIndex: -1 }
+          id: `room_${Date.now()}`,
+          type: 'room',
+          position: { x: minX, y: minY },
+          data: { label: texts.new_room || 'Pièce', color: '#009688' },
+          style: { width: maxX - minX, height: maxY - minY, zIndex: -1 }
         };
-        
-        setNodes((nds) => {
-          let updatedNodes = nds.filter((n) => n.id !== 'wall_preview');
-          if (!isDuplicate) updatedNodes = updatedNodes.concat(newWall);
-          return updatedNodes.concat(roomNode);
-        });
-        
+
+        setNodes(nds => nds.filter(n => n.id !== 'wall_preview').concat(newWall, roomNode));
         setIsDrawingWall(false);
       } else {
-        setNodes((nds) => {
-          let updatedNodes = nds.filter((n) => n.id !== 'wall_preview');
-          return isDuplicate ? updatedNodes : updatedNodes.concat(newWall);
-        });
-        setWallStartPoint(actualNextPoint);
-        setCurrentPath(cp => [...cp, actualNextPoint]);
+        setNodes(nds => nds.filter(n => n.id !== 'wall_preview').concat(newWall));
+        setWallStartPoint(endPoint);
+        setCurrentPath(prev => [...prev, endPoint]);
       }
     }
-  }, [isDrawingWall, wallStartPoint, currentPath, screenToFlowPosition, setNodes, texts.new_room, takeSnapshot, nodes, setIsDrawingWall]);
+  }, [isDrawingWall, wallStartPoint, currentPath, getPoint, screenToFlowPosition, setNodes, takeSnapshot, texts.new_level, setIsDrawingWall]);
 
   const onPaneMouseMove = useCallback((event) => {
     if (!isDrawingWall || !wallStartPoint) return;
-    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-    const snap = 15;
-    const snappedPos = { x: Math.round(position.x / snap) * snap, y: Math.round(position.y / snap) * snap };
-    const dx = snappedPos.x - wallStartPoint.x;
-    const dy = snappedPos.y - wallStartPoint.y;
-    const isHorizontal = Math.abs(dx) > Math.abs(dy);
 
-    const actualNextPoint = isHorizontal ? { x: snappedPos.x, y: wallStartPoint.y } : { x: wallStartPoint.x, y: snappedPos.y };
+    const rawPos = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+    const currentPoint = getPoint(rawPos);
+    
+    const dx = Math.abs(currentPoint.x - wallStartPoint.x);
+    const dy = Math.abs(currentPoint.y - wallStartPoint.y);
+    const isHorizontal = dx > dy;
 
-    let width = 15, height = 15, x = 0, y = 0;
-    let length = 0;
-    if (isHorizontal) {
-      width = Math.max(Math.abs(actualNextPoint.x - wallStartPoint.x) + 15, 15);
-      length = width - 15;
-      x = Math.min(wallStartPoint.x, actualNextPoint.x) - 7.5;
-      y = wallStartPoint.y - 7.5;
-    } else {
-      height = Math.max(Math.abs(actualNextPoint.y - wallStartPoint.y) + 15, 15);
-      length = height - 15;
-      x = wallStartPoint.x - 7.5;
-      y = Math.min(wallStartPoint.y, actualNextPoint.y) - 7.5;
-    }
+    const endPoint = isHorizontal 
+      ? { x: currentPoint.x, y: wallStartPoint.y } 
+      : { x: wallStartPoint.x, y: currentPoint.y };
+
+    const width = isHorizontal ? Math.max(Math.abs(endPoint.x - wallStartPoint.x), 15) : 15;
+    const height = isHorizontal ? 15 : Math.max(Math.abs(endPoint.y - wallStartPoint.y), 15);
+    const x = Math.min(wallStartPoint.x, endPoint.x);
+    const y = Math.min(wallStartPoint.y, endPoint.y);
+
+    const lengthCm = Math.round(isHorizontal ? width : height);
 
     setNodes((nds) => nds.filter((n) => n.id !== 'wall_preview').concat({
-      id: 'wall_preview', type: 'wall', position: { x, y },
-      data: { label: `${Math.round(length)} cm`, isPreview: true },
-      style: { width, height, opacity: 0.9, zIndex: 1000, pointerEvents: 'none', backgroundColor: '#007bff' },
+      id: 'wall_preview',
+      type: 'wall',
+      position: { x, y },
+      data: { label: `${lengthCm} cm`, isPreview: true },
+      style: { width, height, opacity: 0.5, zIndex: 1000, pointerEvents: 'none', backgroundColor: '#007bff' },
     }));
-  }, [isDrawingWall, wallStartPoint, screenToFlowPosition, setNodes]);
+  }, [isDrawingWall, wallStartPoint, getPoint, screenToFlowPosition, setNodes]);
 
   return { onPaneClick, onPaneMouseMove };
 };

@@ -1,21 +1,27 @@
 import { Handle, Position } from 'reactflow';
-import { memo } from 'react';
+import { memo, useContext } from 'react';
+import { getSymbols } from './standards.jsx';
+import { StandardContext } from './StandardContext.jsx';
 
-const SpotLightNode = ({ data, selected }) => {
+const SpotLightNode = ({ data }) => {
+  const standard = useContext(StandardContext);
   const rotation = data?.rotation || 0;
+  const symbols = getSymbols(standard);
+
   return (
     <>
       <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
-      <div style={{ padding: '5px', transform: `rotate(${rotation}deg)`, transition: 'transform 0.2s ease', outline: selected ? '2px dashed #007bff' : 'none' }}>
-        <svg width="40" height="40" viewBox="0 0 100 100">
-          {/* Cercle extérieur */}
-          <circle cx="50" cy="50" r="40" stroke="black" strokeWidth="5" fill="white" />
-          {/* Point/Cercle intérieur pour désigner l'encastrement */}
-          <circle cx="50" cy="50" r="15" fill="black" />
-        </svg>
+      <div style={{ padding: '5px', transform: `rotate(${rotation}deg)`, transition: 'transform 0.2s ease', position: 'relative' }}>
+        {data?.circuit && (
+          <div style={{ position: 'absolute', top: -8, right: -8, background: '#007bff', color: '#fff', borderRadius: '4px', padding: '2px 4px', fontSize: '10px', fontWeight: 'bold', transform: `rotate(${-rotation}deg)`, pointerEvents: 'none', zIndex: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
+            {data.circuit}
+          </div>
+        )}
+        
+        {symbols.spotlight(data?.color || 'var(--text-color)')}
+
       </div>
-      {/* Le label est affiché sous le symbole */}
-      <div style={{ fontSize: '12px', textAlign: 'center', padding: '0 5px 5px 5px' }}>{data.label}</div>
+      <div style={{ fontSize: '10px', textAlign: 'center', marginTop: '2px', color: 'var(--text-color)' }}>{data.label}</div>
       <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
     </>
   );

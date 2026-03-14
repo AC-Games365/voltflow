@@ -1,12 +1,15 @@
 import { Handle, Position } from 'reactflow';
-import { memo } from 'react';
+import { memo, useContext } from 'react';
+import { getSymbols } from './standards.jsx';
+import { StandardContext } from './StandardContext.jsx';
 
-// memoizing the component is a good practice for performance
 const LightNode = ({ data }) => {
+  const standard = useContext(StandardContext);
   const rotation = data?.rotation || 0;
+  const symbols = getSymbols(standard);
+  
   return (
     <>
-      {/* A Handle is a connection point for edges. */}
       <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
       <div style={{ padding: '5px', transform: `rotate(${rotation}deg)`, transition: 'transform 0.2s ease', position: 'relative' }}>
         {data?.circuit && (
@@ -14,19 +17,11 @@ const LightNode = ({ data }) => {
             {data.circuit}
           </div>
         )}
-        {data?.annotation && (
-          <div style={{ position: 'absolute', bottom: -12, right: -12, background: 'rgba(255, 255, 255, 0.9)', color: '#333', border: '1px solid #aaa', borderRadius: '3px', padding: '1px 4px', fontSize: '9px', fontWeight: 'bold', transform: `rotate(${-rotation}deg)`, pointerEvents: 'none', zIndex: 10, whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
-            {data.annotation}
-          </div>
-        )}
-        <svg width="40" height="40" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="45" stroke="black" strokeWidth="5" fill="white" />
-          <line x1="15" y1="15" x2="85" y2="85" stroke="black" strokeWidth="5" />
-          <line x1="85" y1="15" x2="15" y2="85" stroke="black" strokeWidth="5" />
-        </svg>
+        
+        {symbols.light(data?.color || 'var(--text-color)')}
+
       </div>
-      {/* The label is displayed below the symbol */}
-      <div style={{ fontSize: '12px', textAlign: 'center', padding: '0 5px 5px 5px' }}>{data.label}</div>
+      <div style={{ fontSize: '10px', textAlign: 'center', marginTop: '2px', color: 'var(--text-color)' }}>{data.label}</div>
       <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
     </>
   );

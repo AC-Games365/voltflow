@@ -3,7 +3,7 @@ import { memo, useContext } from 'react';
 import { getSymbols } from './standards.jsx';
 import { StandardContext } from './StandardContext.jsx';
 
-const WallLightNode = ({ data }) => {
+const SwitchTwoWayNode = ({ data }) => {
   const standard = useContext(StandardContext);
   const rotation = data?.rotation || 0;
   const symbols = getSymbols(standard);
@@ -18,7 +18,7 @@ const WallLightNode = ({ data }) => {
           </div>
         )}
         
-        {symbols.wall_light(data?.color || 'var(--text-color)')}
+        {symbols.switch_two_way(data?.color || 'var(--text-color)')}
 
       </div>
       <div style={{ fontSize: '10px', textAlign: 'center', marginTop: '2px', color: 'var(--text-color)' }}>{data.label}</div>
@@ -27,4 +27,4 @@ const WallLightNode = ({ data }) => {
   );
 };
 
-export default memo(WallLightNode);
+export default memo(SwitchTwoWayNode);

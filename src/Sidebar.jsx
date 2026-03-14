@@ -4,7 +4,8 @@ export default function Sidebar({
   lang, setLang, texts, isDrawingWall, setIsDrawingWall, 
   onExportImage, onPrint, onSave, onClear, onExportJSON, 
   onImportJSON, onExportPDF, viewMode, sidebarItems, moveSidebarItem,
-  theme, setTheme, onSettingsClick, activeCircuit
+  theme, setTheme, onSettingsClick, activeCircuit, setActiveCircuit,
+  isGeneratingPDF
 }) {
 
   const importInputRef = useRef(null);
@@ -50,6 +51,9 @@ export default function Sidebar({
     importInputRef.current?.click();
   };
 
+  // Liste des lettres pour les circuits (A à Z)
+  const alphabet = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
+
   return (
     <aside className="no-print" style={{ display: 'flex', flexDirection: 'column', width: '250px', background: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)', padding: '15px', color: 'var(--text-color)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -59,15 +63,18 @@ export default function Sidebar({
         </button>
       </div>
 
-      {activeCircuit && (
-        <div style={{ padding: '5px 8px', background: 'var(--item-hover)', border: '1px solid var(--item-border)', borderRadius: '4px', fontSize: '12px', marginBottom: '10px', textAlign: 'center' }}>
-          Circuit Actif : <strong style={{ color: 'var(--button-primary-bg)' }}>{activeCircuit}</strong>
+      <div style={{ padding: '10px', background: 'var(--item-hover)', border: '1px solid var(--item-border)', borderRadius: '4px', marginBottom: '15px' }}>
+        <label style={{ display: 'block', fontSize: '11px', fontWeight: 'bold', marginBottom: '5px', opacity: 0.7 }}>CIRCUIT ACTIF</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <select 
+            value={activeCircuit} 
+            onChange={(e) => setActiveCircuit(e.target.value)}
+            style={{ flexGrow: 1, padding: '4px', borderRadius: '4px', border: '1px solid var(--item-border)', background: 'var(--item-bg)', color: 'var(--text-color)', fontWeight: 'bold' }}
+          >
+            {alphabet.map(letter => <option key={letter} value={letter}>Circuit {letter}</option>)}
+          </select>
         </div>
-      )}
-
-      <p style={{ fontSize: '12px', color: 'var(--text-color)', opacity: 0.8, marginBottom: '15px', textAlign: 'left' }}>
-        {texts.drag_drop}
-      </p>
+      </div>
 
       <div style={{ flexGrow: 1, overflowY: 'auto', paddingRight: '5px' }}>
         {viewMode === 'plan' ? (
@@ -80,13 +87,9 @@ export default function Sidebar({
                   {isDrawingWall ? texts.cancel_draw : texts.draw_wall}
                 </div>
                 
-                {sidebarItems && sidebarItems.map((item, index) => (
-                   item.type === 'room' && (
-                     <div key={index} onDragStart={(event) => onDragStart(event, 'room', texts.new_room)} draggable style={{...itemStyle, background: theme === 'dark' ? '#004d40' : '#e0f7fa', border: '2px dashed #009688'}}>
-                       {texts.room}
-                     </div>
-                   )
-                ))}
+                <div onDragStart={(event) => onDragStart(event, 'room', texts.room)} draggable style={{...itemStyle, background: theme === 'dark' ? '#004d40' : '#e0f7fa', border: '2px dashed #009688'}}>
+                  {texts.room}
+                </div>
 
                 <div onDragStart={(event) => onDragStart(event, 'door', texts.door)} draggable style={{...itemStyle, borderStyle: 'dashed'}}>
                   {texts.door}
@@ -115,6 +118,9 @@ export default function Sidebar({
                 <div onDragStart={(event) => onDragStart(event, 'socket_double', texts.socket_double)} draggable style={itemStyle}>{texts.socket_double}</div>
                 <div onDragStart={(event) => onDragStart(event, 'socket_triple', texts.socket_triple)} draggable style={itemStyle}>{texts.socket_triple}</div>
                 <div onDragStart={(event) => onDragStart(event, 'switch', texts.switch)} draggable style={itemStyle}>{texts.switch}</div>
+                <div onDragStart={(event) => onDragStart(event, 'switch_double', texts.switch_double)} draggable style={itemStyle}>{texts.switch_double}</div>
+                <div onDragStart={(event) => onDragStart(event, 'switch_two_way', texts.switch_two_way)} draggable style={itemStyle}>{texts.switch_two_way}</div>
+                <div onDragStart={(event) => onDragStart(event, 'push_button', texts.push_button)} draggable style={itemStyle}>{texts.push_button}</div>
               </div>
             </details>
 
@@ -124,6 +130,7 @@ export default function Sidebar({
               <div style={{ paddingTop: '5px' }}>
                 <div onDragStart={(event) => onDragStart(event, 'panel', texts.panel)} draggable style={itemStyle}>{texts.panel}</div>
                 <div onDragStart={(event) => onDragStart(event, 'breaker', texts.breaker)} draggable style={itemStyle}>{texts.breaker}</div>
+                <div onDragStart={(event) => onDragStart(event, 'rcd', texts.rcd)} draggable style={itemStyle}>{texts.rcd}</div>
                 <div onDragStart={(event) => onDragStart(event, 'junction_box', texts.junction_box)} draggable style={itemStyle}>{texts.junction_box}</div>
               </div>
             </details>
@@ -139,14 +146,20 @@ export default function Sidebar({
         )}
         
         {/* ACTIONS GLOBALES */}
-        <details style={detailsStyle} open>
+        <details style={detailsStyle}>
           <summary style={summaryStyle}>{texts.cat_actions}</summary>
           <div style={{ paddingTop: '5px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <button onClick={onSave} style={{ width: '100%', padding: '8px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>{texts.save_plan}</button>
+            <button 
+              onClick={onExportPDF} 
+              disabled={isGeneratingPDF}
+              style={{ width: '100%', padding: '8px', background: '#e83e8c', color: '#fff', border: 'none', borderRadius: '4px', cursor: isGeneratingPDF ? 'wait' : 'pointer', fontWeight: 'bold' }}
+            >
+              {isGeneratingPDF ? (texts.generating_pdf || '⏳ Génération...') : (texts.export_pdf || '📄 Exporter PDF')}
+            </button>
             <button onClick={handleImportClick} style={{ width: '100%', padding: '8px', background: '#17a2b8', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>{texts.import_project || 'Importer un projet'}</button>
             <input type="file" ref={importInputRef} onChange={onImportJSON} accept=".json" style={{ display: 'none' }} />
             <button onClick={onExportJSON} style={{ width: '100%', padding: '8px', background: '#fd7e14', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>{texts.export_project}</button>
-            <button onClick={onExportImage} style={{ width: '100%', padding: '8px', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>{texts.export_image}</button>
             <button onClick={onClear} style={{ width: '100%', padding: '8px', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>{texts.clear_plan}</button>
           </div>
         </details>
