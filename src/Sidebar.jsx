@@ -4,7 +4,7 @@ export default function Sidebar({
   lang, setLang, texts, isDrawingWall, setIsDrawingWall, 
   onExportImage, onPrint, onSave, onClear, onExportJSON, 
   onImportJSON, onExportPDF, viewMode, sidebarItems, moveSidebarItem,
-  theme, setTheme, onSettingsClick
+  theme, setTheme, onSettingsClick, activeCircuit
 }) {
 
   const importInputRef = useRef(null);
@@ -24,7 +24,9 @@ export default function Sidebar({
     cursor: 'grab', 
     borderRadius: '4px',
     background: 'var(--item-bg)',
-    color: 'var(--text-color)'
+    color: 'var(--text-color)',
+    textAlign: 'left',
+    paddingLeft: '15px'
   };
 
   const summaryStyle = {
@@ -37,7 +39,9 @@ export default function Sidebar({
     marginBottom: '5px',
     userSelect: 'none',
     fontSize: '13px',
-    color: 'var(--text-color)'
+    color: 'var(--text-color)',
+    textAlign: 'left',
+    paddingLeft: '10px'
   };
 
   const detailsStyle = { marginBottom: '15px' };
@@ -48,14 +52,20 @@ export default function Sidebar({
 
   return (
     <aside className="no-print" style={{ display: 'flex', flexDirection: 'column', width: '250px', background: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)', padding: '15px', color: 'var(--text-color)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
         <h3 style={{ margin: 0 }}>{texts.toolbox}</h3>
         <button onClick={onSettingsClick} style={{ background: 'transparent', border: '1px solid var(--item-border)', borderRadius: '4px', cursor: 'pointer', padding: '4px 8px', fontSize: '18px' }} title={texts.settings_title}>
           ⚙️
         </button>
       </div>
 
-      <p style={{ fontSize: '12px', color: 'var(--text-color)', opacity: 0.8, marginBottom: '15px' }}>
+      {activeCircuit && (
+        <div style={{ padding: '5px 8px', background: 'var(--item-hover)', border: '1px solid var(--item-border)', borderRadius: '4px', fontSize: '12px', marginBottom: '10px', textAlign: 'center' }}>
+          Circuit Actif : <strong style={{ color: 'var(--button-primary-bg)' }}>{activeCircuit}</strong>
+        </div>
+      )}
+
+      <p style={{ fontSize: '12px', color: 'var(--text-color)', opacity: 0.8, marginBottom: '15px', textAlign: 'left' }}>
         {texts.drag_drop}
       </p>
 

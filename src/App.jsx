@@ -78,6 +78,7 @@ function Editor() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState('plan');
   const [isDrawingWall, setIsDrawingWall] = useState(false);
+  const [activeCircuit, setActiveCircuit] = useState('');
 
   const { state, setState, takeSnapshot, undo, redo, canUndo, canRedo } = useUndoRedo(getSavedPlan());
   const { nodes, edges, projectData } = state;
@@ -91,8 +92,14 @@ function Editor() {
   const selectedEdges = useMemo(() => edges.filter(e => e.selected), [edges]);
   const selectedEdge = useMemo(() => selectedEdges.length === 1 ? selectedEdges[0] : null, [selectedEdges]);
 
-  const { onNodesChange, onConnect, onDrop, updateNodeData, updateNodeProperty, updateNodeStyle, updateEdgeLabel, updateEdgeColor, updateEdgeArrow, updateEdgeType, onGroup, onUngroup, onDuplicate } = useNodeManagement({ setNodes, setEdges, takeSnapshot, selectedNodes, selectedNode, selectedEdge });
-  const { onPaneClick, onPaneMouseMove } = useWallDrawer({ isDrawingWall, setIsDrawingWall, setNodes, takeSnapshot, texts });
+  useEffect(() => {
+    if (selectedNode?.data?.circuit) {
+      setActiveCircuit(selectedNode.data.circuit);
+    }
+  }, [selectedNode]);
+
+  const { onNodesChange, onConnect, onDrop, updateNodeData, updateNodeProperty, updateNodeStyle, updateEdgeLabel, updateEdgeColor, updateEdgeArrow, updateEdgeType, onGroup, onUngroup, onDuplicate } = useNodeManagement({ nodes, setNodes, setEdges, takeSnapshot, selectedNodes, selectedNode, selectedEdge, activeCircuit, setActiveCircuit });
+  const { onPaneClick, onPaneMouseMove } = useWallDrawer({ isDrawingWall, setIsDrawingWall, nodes, setNodes, takeSnapshot, texts });
   const { onExportImage, onSave, onClear, onExportJSON, onImportJSON, exportToCSV, handleImageUpload } = useFileHandlers({ ...state, setNodes, setEdges, setProjectData, takeSnapshot, reactFlowWrapper, texts, lang });
 
   const materialCounts = useMemo(() => {
@@ -103,6 +110,74 @@ function Editor() {
     });
     return counts;
   }, [nodes]);
+
+  const { uNodes, uEdges } = useMemo(() => {
+    if (viewMode !== 'unifilaire') return { uNodes: [], uEdges: [] };
+    const uNodes = [], uEdges = [], circuits = {};
+    nodes.forEach(n => {
+      if (n.data?.circuit) {
+        const c = n.data.circuit;
+        if (!circuits[c]) circuits[c] = { components: [], breaker: null };
+        if (n.type === 'breaker') circuits[c].breaker = n;
+        else circuits[c].components.push(n);
+      }
+    });
+    const circuitKeys = Object.keys(circuits).sort();
+    if (circuitKeys.length === 0) {
+      uNodes.push({ id: 'empty', type: 'text', position: { x: 200, y: 200 }, data: { label: texts.no_circuit, fontSize: 24, color: '#dc3545' } });
+      return { uNodes, uEdges };
+    }
+    let currentX = 100;
+    const startY = 150;
+    uNodes.push({ id: 'uni_main', type: 'text', position: { x: 100, y: startY - 100 }, data: { label: texts.main_supply, fontSize: 16, color: '#007bff' } });
+    circuitKeys.forEach((circuitName) => {
+      const circ = circuits[circuitName];
+      const brkId = `uni_brk_${circuitName}`;
+      uNodes.push({ id: brkId, type: 'breaker', position: { x: currentX, y: startY }, data: { label: `Circ. ${circuitName}`, amperage: circ.breaker?.data?.amperage || '16A', circuit: circuitName } });
+      uEdges.push({ id: `e_m_${brkId}`, source: 'uni_main', target: brkId, type: 'step' });
+      let currentY = startY + 100, prevId = brkId;
+      circ.components.forEach((comp, idx) => {
+        const cId = `uni_c_${circuitName}_${idx}`;
+        uNodes.push({ id: cId, type: comp.type, position: { x: currentX, y: currentY }, data: { ...comp.data, rotation: 0 } });
+        uEdges.push({ id: `e_${prevId}_${cId}`, source: prevId, target: cId, type: 'straight' });
+        prevId = cId;
+        currentY += 80;
+      });
+      currentX += 150;
+    });
+    return { uNodes, uEdges };
+  }, [viewMode, nodes, texts]);
+
+  const existingCircuits = useMemo(() => Array.from(new Set(nodes.map(n => n.data?.circuit).filter(Boolean))), [nodes]);
+
+  const handleSuggestNewCircuit = useCallback(() => {
+    if (!selectedNode) return;
+    takeSnapshot();
+    const topLevelCircuits = new Set(existingCircuits.map(c => c.charAt(0)));
+    let nextLetter = 'A';
+    while (topLevelCircuits.has(nextLetter)) {
+      nextLetter = String.fromCharCode(nextLetter.charCodeAt(0) + 1);
+    }
+    updateNodeData('circuit', nextLetter);
+  }, [selectedNode, existingCircuits, updateNodeData, takeSnapshot]);
+
+  const handleSuggestSubCircuit = useCallback(() => {
+    if (!selectedNode || !selectedNode.data?.circuit) return;
+    takeSnapshot();
+    const baseCircuit = selectedNode.data.circuit.match(/^[A-Z]+/)?.[0];
+    if (!baseCircuit) return;
+    
+    const subCircuitRegex = new RegExp(`^${baseCircuit}(\\d+)$`);
+    let maxNum = 0;
+    existingCircuits.forEach(c => {
+      const match = c.match(subCircuitRegex);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    });
+    updateNodeData('circuit', `${baseCircuit}${maxNum + 1}`);
+  }, [selectedNode, existingCircuits, updateNodeData, takeSnapshot]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -130,7 +205,7 @@ function Editor() {
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh', cursor: isDrawingWall ? 'crosshair' : 'default', backgroundColor: 'var(--bg-color)', color: 'var(--text-color)' }}>
       {isSidebarOpen && (
-        <Sidebar lang={lang} setLang={setLang} texts={texts} isDrawingWall={isDrawingWall} setIsDrawingWall={setIsDrawingWall} onExportImage={onExportImage} onSave={onSave} onClear={onClear} onExportJSON={onExportJSON} onImportJSON={onImportJSON} viewMode={viewMode} theme={theme} setTheme={setTheme} onSettingsClick={() => setIsSettingsModalOpen(true)} />
+        <Sidebar lang={lang} setLang={setLang} texts={texts} isDrawingWall={isDrawingWall} setIsDrawingWall={setIsDrawingWall} onExportImage={onExportImage} onSave={onSave} onClear={onClear} onExportJSON={onExportJSON} onImportJSON={onImportJSON} viewMode={viewMode} theme={theme} setTheme={setTheme} onSettingsClick={() => setIsSettingsModalOpen(true)} activeCircuit={activeCircuit} />
       )}
 
       <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} theme={theme} setTheme={setTheme} lang={lang} setLang={setLang} texts={texts} />
@@ -152,10 +227,10 @@ function Editor() {
         </div>
 
         <ReactFlow 
-          nodes={nodes} 
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={setEdges}
+          nodes={viewMode === 'plan' ? nodes : uNodes} 
+          edges={viewMode === 'plan' ? edges : uEdges}
+          onNodesChange={viewMode === 'plan' ? onNodesChange : undefined}
+          onEdgesChange={viewMode === 'plan' ? setEdges : undefined}
           onConnect={onConnect}
           onDrop={onDrop}
           onDragOver={(e) => e.preventDefault()}
@@ -226,7 +301,17 @@ function Editor() {
   
             {selectedNode && selectedNode.type !== 'wall' && selectedNode.type !== 'group' && (<div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.name_label}</label><input type="text" value={selectedNode.data?.label || ''} onFocus={takeSnapshot} onChange={(e) => updateNodeData('label', e.target.value)} style={{ width: '100%', padding: '5px', boxSizing: 'border-box' }}/></div>)}
             
-            {selectedNode && ['light', 'spotlight', 'wall_light', 'socket', 'socket_double', 'socket_triple', 'switch', 'breaker'].includes(selectedNode.type) && (<div style={{ marginBottom: '10px', padding: '10px', background: 'var(--item-bg)', border: '1px solid var(--item-border)', borderRadius: '4px' }}><label style={{ display: 'block', fontSize: '12px', color: '#007bff', fontWeight: 'bold', marginBottom: '5px' }}>{texts.circuit_name}</label><input type="text" value={selectedNode.data?.circuit || ''} onFocus={takeSnapshot} onChange={(e) => updateNodeData('circuit', e.target.value.toUpperCase())} style={{ width: '100%', padding: '5px', boxSizing: 'border-box', border: '1px solid #007bff', outline: 'none' }}/></div>)}
+            {selectedNode && ['light', 'spotlight', 'wall_light', 'socket', 'socket_double', 'socket_triple', 'switch', 'breaker'].includes(selectedNode.type) && (
+              <div style={{ marginBottom: '10px', padding: '10px', background: 'var(--item-bg)', border: '1px solid var(--item-border)', borderRadius: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#007bff', fontWeight: 'bold', marginBottom: '5px' }}>{texts.circuit_name}</label>
+                <div style={{ display: 'flex', gap: '5px' }}>
+                  <input list="circuit-suggestions" type="text" value={selectedNode.data?.circuit || ''} onFocus={takeSnapshot} onChange={(e) => updateNodeData('circuit', e.target.value.toUpperCase())} style={{ width: '100%', padding: '5px', boxSizing: 'border-box', border: '1px solid #007bff', outline: 'none' }}/>
+                  <datalist id="circuit-suggestions">{existingCircuits.map(c => <option key={c} value={c} />)}</datalist>
+                  <button onClick={handleSuggestNewCircuit} title="Suggérer un nouveau circuit principal (A, B, C...)">N</button>
+                  <button onClick={handleSuggestSubCircuit} title="Suggérer un sous-circuit (A1, A2...)" disabled={!selectedNode.data?.circuit}>S</button>
+                </div>
+              </div>
+            )}
   
             {selectedNode && selectedNode.type === 'breaker' && (<div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.amperage}</label><input type="text" value={selectedNode.data?.amperage || ''} onFocus={takeSnapshot} onChange={(e) => updateNodeData('amperage', e.target.value)} style={{ width: '100%', padding: '5px', boxSizing: 'border-box' }}/></div>)}
   

@@ -3,7 +3,7 @@ import { useReactFlow, applyNodeChanges, addEdge, MarkerType } from 'reactflow';
 
 const getId = () => `dndnode_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-export const useNodeManagement = ({ setNodes, setEdges, takeSnapshot, selectedNodes, selectedNode, selectedEdge }) => {
+export const useNodeManagement = ({ nodes, setNodes, setEdges, takeSnapshot, selectedNodes, selectedNode, selectedEdge, activeCircuit, setActiveCircuit }) => {
   const { screenToFlowPosition } = useReactFlow();
 
   const onNodesChange = useCallback((changes) => {
@@ -25,20 +25,50 @@ export const useNodeManagement = ({ setNodes, setEdges, takeSnapshot, selectedNo
     takeSnapshot();
     
     const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+
+    // --- Logique d'assignation automatique du circuit ---
+    let nextCircuit = '';
+    if (activeCircuit) {
+      const baseCircuit = activeCircuit.match(/^[A-Z]+/)?.[0] || activeCircuit;
+      const subCircuitRegex = new RegExp(`^${baseCircuit}(\\d+)$`);
+      let maxNum = 0;
+      nodes.forEach(n => {
+        if (n.data?.circuit) {
+          if (n.data.circuit === baseCircuit && maxNum === 0) maxNum = 1; // Si A existe, le prochain est A1
+          const match = n.data.circuit.match(subCircuitRegex);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (num >= maxNum) maxNum = num + 1;
+          }
+        }
+      });
+      if (maxNum === 0) maxNum = 1; // Si aucun sous-circuit n'existe, on commence à 1
+      nextCircuit = `${baseCircuit}${maxNum}`;
+    }
+    
     const newNode = {
       id: getId(), type, position,
-      data: { label: event.dataTransfer.getData('application/reactflow-label') || type },
+      data: { 
+        label: event.dataTransfer.getData('application/reactflow-label') || type,
+        circuit: nextCircuit,
+      },
     };
+
     setNodes((nds) => nds.concat(newNode));
-  }, [screenToFlowPosition, setNodes, takeSnapshot]);
+    if (nextCircuit) setActiveCircuit(nextCircuit); // Met à jour le circuit actif avec le nouveau
+
+  }, [screenToFlowPosition, nodes, setNodes, takeSnapshot, activeCircuit, setActiveCircuit]);
 
   const updateNodeData = useCallback((key, value) => {
     takeSnapshot();
+    if (key === 'circuit') {
+      setActiveCircuit(value.toUpperCase());
+    }
     setNodes((nds) => nds.map((node) => {
       if (node.selected) return { ...node, data: { ...node.data, [key]: value } };
       return node;
     }));
-  }, [setNodes, takeSnapshot]);
+  }, [setNodes, takeSnapshot, setActiveCircuit]);
 
   const updateNodeProperty = useCallback((key, value) => {
     takeSnapshot();
