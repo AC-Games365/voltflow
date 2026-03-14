@@ -1,0 +1,49 @@
+:root {
+  /* Thème Clair (par défaut) */
+  --bg-color: #ffffff;
+  --text-color: #333333;
+  --sidebar-bg: #f8f9fa;
+  --sidebar-border: #dee2e6;
+  --item-bg: #ffffff;
+  --item-border: #ced4da;
+  --item-hover: #e9ecef;
+  --button-primary-bg: #007bff;
+  --button-primary-text: #ffffff;
+  --button-secondary-bg: #6c757d;
+  --button-secondary-text: #ffffff;
+  --panel-bg: #ffffff;
+  --panel-border: #333333;
+  --input-bg: #ffffff;
+  --input-text: #333333;
+  --input-border: #ced4da;
+}
+
+[data-theme='dark'] {
+  /* Thème Sombre */
+  --bg-color: #1e1e1e;
+  --text-color: #e0e0e0;
+  --sidebar-bg: #252526;
+  --sidebar-border: #3e3e42;
+  --item-bg: #2d2d30;
+  --item-border: #3e3e42;
+  --item-hover: #3e3e42;
+  --button-primary-bg: #0e639c;
+  --button-primary-text: #ffffff;
+  --button-secondary-bg: #3e3e42;
+  --button-secondary-text: #ffffff;
+  --panel-bg: #252526;
+  --panel-border: #555555;
+  --input-bg: #3c3c3c;
+  --input-text: #e0e0e0;
+  --input-border: #555555;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+button {
+  transition: background-color 0.2s;
+}
