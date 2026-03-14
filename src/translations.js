@@ -78,7 +78,7 @@ export const t = {
     import_project: '📥 Importer un projet',
     cat_actions: '💾 Fichiers & Sauvegarde',
     export_pdf: '📄 Exporter en PDF (Complet)',
-      camera: 'Caméra',
+    camera: 'Caméra',
     generating_pdf: '⏳ Création du PDF en cours, veuillez patienter...',
     company_logo: '🏢 Logo de l\'entreprise :',
     total_cable: 'Bobine de câble (approx.)',
@@ -91,7 +91,12 @@ export const t = {
     cable_dash_solid: 'Continu',
     cable_dash_dashed: 'Tirets',
     cable_dash_dotted: 'Pointillés',
-    show_frame: 'Afficher le cadre de repérage (PDF)'
+    show_frame: 'Afficher le cadre de repérage (PDF)',
+    settings_title: 'Paramètres',
+    theme_label: 'Thème',
+    theme_light: 'Clair',
+    theme_dark: 'Sombre',
+    language_label: 'Langue',
   },
   en: {
     toolbox: 'Toolbox',
@@ -172,7 +177,7 @@ export const t = {
     import_project: '📥 Import Project',
     cat_actions: '💾 Files & Backup',
     export_pdf: '📄 Export to PDF (Full)',
-   camera: 'Camera',
+    camera: 'Camera',
     generating_pdf: '⏳ Generating PDF, please wait...',
     company_logo: '🏢 Company logo:',
     total_cable: 'Cable spool (approx.)',
@@ -185,6 +190,11 @@ export const t = {
     cable_dash_solid: 'Solid',
     cable_dash_dashed: 'Dashed',
     cable_dash_dotted: 'Dotted',
-    show_frame: 'Show reference frame (PDF)'
+    show_frame: 'Show reference frame (PDF)',
+    settings_title: 'Settings',
+    theme_label: 'Theme',
+    theme_light: 'Light',
+    theme_dark: 'Dark',
+    language_label: 'Language',
   }
 };
