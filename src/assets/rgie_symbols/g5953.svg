@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" style="stroke-linejoin:bevel;stroke:#000000;stroke-linecap:square;fill:none" viewBox="409.4400329589844 405.302001953125 24.720001220703125 39.52001953125"><g id="g5953" font-size="11" font-weight="400">
+      <g id="g942" style="stroke-linejoin:bevel;stroke:#000000;stroke-linecap:square;fill:#ffffff" transform="matrix(1.184 0 0 1.184 420.32 415.59)">
+        <path id="path944" d="m7.5 8c0 4.142-3.3579 7.5-7.5 7.5s-7.5-3.358-7.5-7.5c0-4.1421 3.3579-7.5 7.5-7.5s7.5 3.3579 7.5 7.5" style="fill:#ffffff" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" inkscape:connector-curvature="0"/>
+      </g>
+      <g id="g946" style="stroke-linejoin:bevel;stroke:#000000;stroke-linecap:square;fill:none" transform="matrix(1.184 0 0 1.184 420.32 415.59)">
+        <path id="path948" d="m4.25 8c0 2.347-1.9028 4.25-4.25 4.25s-4.25-1.903-4.25-4.25c0-2.3472 1.9028-4.25 4.25-4.25s4.25 1.9028 4.25 4.25" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" inkscape:connector-curvature="0"/>
+      </g>
+      <g id="g922" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" transform="matrix(1.184 0 0 1.184 420.32 415.59)" stroke-miterlimit="2">
+        <polyline id="polyline924" style="fill:none" points="5 18 5 23"/>
+      </g>
+      <g id="g926" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" transform="matrix(1.184 0 0 1.184 420.32 415.59)" stroke-miterlimit="2">
+        <polyline id="polyline928" style="fill:none" points="5 -2 5 -7"/>
+      </g>
+      <g id="g930" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" transform="matrix(1.184 0 0 1.184 420.32 415.59)" stroke-miterlimit="2">
+        <polyline id="polyline932" style="fill:none" points="5 -2 10 -2"/>
+      </g>
+      <g id="g934" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" transform="matrix(1.184 0 0 1.184 420.32 415.59)" stroke-miterlimit="2">
+        <polyline id="polyline936" style="fill:none" points="5 18 10 18"/>
+      </g>
+      <g id="g938" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" transform="matrix(1.184 0 0 1.184 420.32 415.59)" stroke-miterlimit="2">
+        <polyline id="polyline940" style="fill:none" points="10 -2 10 18"/>
+      </g>
+    </g></svg>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Extracteur de Symboles Électriques RGIE</title>
+  <!-- Librairie JSZip pour télécharger tous les SVG d'un coup -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
+    .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    button { padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;}
+    button:hover { background: #0056b3; }
+    .grid { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 20px; }
+    .icon-box { border: 1px solid #ddd; padding: 10px; border-radius: 6px; background: white; display: flex; flex-direction: column; align-items: center; width: 80px; }
+    .icon-box svg { width: 50px; height: 50px; margin-bottom: 5px; }
+    .icon-box span { font-size: 10px; color: #555; font-family: monospace; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>1. Sélectionne ton fichier SVG</h2>
+    <input type="file" id="fileInput" accept=".svg" />
+    <button id="downloadBtn" style="display:none; margin-left: 20px;">📦 Télécharger le ZIP</button>
+  </div>
+
+  <div class="grid" id="preview"></div>
+
+  <script>
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(evt.target.result, "image/svg+xml");
+        
+        // Le groupe qui contient tous les symboles dans ton fichier est g10
+        const mainGroup = doc.querySelector('#g10');
+        if (!mainGroup) {
+          alert("Le groupe #g10 n'a pas été trouvé. Vérifie le fichier.");
+          return;
+        }
+
+        // On récupère les styles par défaut du parent pour les appliquer aux enfants isolés
+        const mainStyle = mainGroup.getAttribute('style') || "stroke-linejoin:bevel;stroke:#000000;stroke-linecap:square;fill:none";
+        
+        // Récupérer tous les sous-groupes (qui sont les symboles)
+        const symbols = Array.from(mainGroup.children).filter(el => el.tagName.toLowerCase() === 'g');
+
+        const zip = new JSZip();
+        const previewDiv = document.getElementById('preview');
+        previewDiv.innerHTML = '';
+
+        // Conteneur caché pour faire les calculs de rendu de taille
+        const hiddenContainer = document.createElement('div');
+        hiddenContainer.style.visibility = 'hidden';
+        hiddenContainer.style.position = 'absolute';
+        document.body.appendChild(hiddenContainer);
+
+        symbols.forEach((symbol, index) => {
+          const id = symbol.id || `symbole_${index}`;
+
+          // Création du SVG de destination
+          const newSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          newSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+          newSvg.setAttribute('style', mainStyle); // Reporter le style du groupe principal
+
+          // Cloner le contenu
+          const clone = symbol.cloneNode(true);
+          
+          // Magie 1 : On supprime la position globale d'origine du composant.
+          // Ainsi, il sera dessiné dans ses coordonnées locales, dans la viewBox.
+          clone.removeAttribute('transform');
+          
+          newSvg.appendChild(clone);
+          hiddenContainer.appendChild(newSvg);
+
+          // Magie 2 : on calcule la "boite de délimitation" exacte du dessin une fois rendu
+          let bbox = { x: 0, y: 0, width: 50, height: 50 };
+          try {
+            bbox = clone.getBBox();
+          } catch (e) {
+            console.warn("Impossible de calculer la BBox pour le symbole :", id);
+          }
+          const padding = 2; // Marges de sécurité
+          
+          // On cadre le SVG exactement autour du dessin
+          newSvg.setAttribute('viewBox', `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding * 2} ${bbox.height + padding * 2}`);
+
+          // Rendu pour la prévisualisation
+          const wrapper = document.createElement('div');
+          wrapper.className = 'icon-box';
+          wrapper.appendChild(newSvg.cloneNode(true));
+          
+          const label = document.createElement('span');
+          label.textContent = id;
+          wrapper.appendChild(label);
+          previewDiv.appendChild(wrapper);
+
+          // Ajout du fichier au fichier zip
+          const serializer = new XMLSerializer();
+          // On s'assure d'ajouter le tag d'entête XML correct
+          const svgString = '<?xml version="1.0" encoding="UTF-8"?>\n' + serializer.serializeToString(newSvg);
+          zip.file(`${id}.svg`, svgString);
+
+          // Nettoyage du DOM caché
+          hiddenContainer.removeChild(newSvg);
+        });
+
+        document.body.removeChild(hiddenContainer);
+
+        // Afficher le bouton de téléchargement
+        const dlBtn = document.getElementById('downloadBtn');
+        dlBtn.style.display = 'inline-block';
+        dlBtn.onclick = function() {
+          zip.generateAsync({type:"blob"}).then(function(content) {
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(content);
+            a.download = "symboles-rgie.zip";
+            a.click();
+          });
+        };
+      };
+      reader.readAsText(file);
+    });
+  </script>
+</body>
+</html>

@@ -6,6 +6,7 @@ import ReactFlow, {
   useEdgesState,
   Panel,
   MarkerType,
+  useReactFlow
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -54,7 +55,7 @@ import CameraNode from './CameraNode.jsx';
 import RcdNode from './RcdNode.jsx';
 import { t } from './translations.js';
 
-const nodeTypes = {
+const initialNodeTypes = {
   light: LightNode,
   socket: SocketNode,
   socket_double: DoubleSocketNode,
@@ -116,10 +117,14 @@ const getSavedPlan = (currentUser) => {
 };
 
 function Editor() {
+  const { fitView } = useReactFlow();
   const reactFlowWrapper = useRef(null);
   const [lang, setLang] = useState('fr');
   const [theme, setTheme] = useState(localStorage.getItem('voltflow-theme') || 'light');
   const texts = t[lang];
+
+  // Memoize nodeTypes pour éviter le warning React Flow
+  const nodeTypes = useMemo(() => initialNodeTypes, []);
 
   const [currentUser, setCurrentUser] = useState({ name: 'Jean Dupont', email: 'jean.dupont@exemple.com' });
   const [currentPage, setCurrentPage] = useState('home');
@@ -129,6 +134,7 @@ function Editor() {
   const [viewMode, setViewMode] = useState('plan');
   const [isDrawingWall, setIsDrawingWall] = useState(false);
   const [activeMainCircuit, setActiveMainCircuit] = useState('A');
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Trigger force refresh
 
   const { state, setState, takeSnapshot, undo, redo, canUndo, canRedo } = useUndoRedo(getSavedPlan(currentUser));
   const { levels, activeLevelId, projectData } = state;
@@ -137,6 +143,14 @@ function Editor() {
   const activeLevel = useMemo(() => levels.find(l => l.id === activeLevelId) || levels[0], [levels, activeLevelId]);
   const nodes = activeLevel.nodes;
   const edges = activeLevel.edges;
+
+  // Réajuster la vue lors du changement de mode (plan <-> unifilaire)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fitView({ padding: 0.2, duration: 500 });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [viewMode, fitView, refreshTrigger]);
 
   const setNodes = useCallback((newNodes) => {
     setState(cs => ({
@@ -206,13 +220,16 @@ function Editor() {
     const initialEdges = [];
     const circuits = {};
 
+    // Forcer le recalcule
+    const _ = refreshTrigger;
+
     levels.forEach(level => {
       level.nodes.forEach(n => {
         const circuitName = n.data?.circuit;
         if (circuitName !== null && circuitName !== undefined && String(circuitName).trim() !== '') {
-          const c = String(circuitName).trim();
+          const c = String(circuitName).trim().toUpperCase();
           if (!circuits[c]) circuits[c] = { components: [], breaker: null };
-          if (n.type === 'breaker') circuits[c].breaker = n;
+          if (n.type === 'breaker' || n.type === 'rcd') circuits[c].breaker = n;
           else circuits[c].components.push(n);
         }
       });
@@ -243,14 +260,38 @@ function Editor() {
       const circ = circuits[circuitName];
       const brkId = `uni_brk_${circuitName}`;
       
-      initialNodes.push({ id: brkId, type: 'breaker', data: { label: `Circ. ${circuitName}`, amperage: circ.breaker?.data?.amperage || '16A', circuit: circuitName } });
-      initialEdges.push({ id: `e_main_${brkId}`, source: 'uni_main', target: brkId });
+      // On affiche le circuit même s'il n'y a pas de disjoncteur explicitement posé.
+      // S'il n'y a pas de disjoncteur, on en crée un "virtuel" pour le schéma unifilaire.
+      initialNodes.push({ 
+        id: brkId, 
+        type: circ.breaker ? circ.breaker.type : 'breaker', 
+        data: { 
+          label: `Circ. ${circuitName}`, 
+          amperage: circ.breaker?.data?.amperage || '16A', 
+          circuit: circuitName 
+        } 
+      });
+      initialEdges.push({ 
+        id: `e_main_${brkId}`, 
+        source: 'uni_main', 
+        target: brkId,
+        type: 'smoothstep' 
+      });
 
       let prevId = brkId;
       circ.components.forEach((comp, idx) => {
         const cId = `uni_c_${circuitName}_${idx}`;
-        initialNodes.push({ id: cId, type: comp.type, data: { ...comp.data, rotation: 0 } });
-        initialEdges.push({ id: `e_${prevId}_${cId}`, source: prevId, target: cId });
+        initialNodes.push({ 
+          id: cId, 
+          type: comp.type, 
+          data: { ...comp.data, rotation: 0 } 
+        });
+        initialEdges.push({ 
+          id: `e_${prevId}_${cId}`, 
+          source: prevId, 
+          target: cId,
+          type: 'smoothstep'
+        });
         prevId = cId;
       });
     });
@@ -258,7 +299,7 @@ function Editor() {
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(initialNodes, initialEdges);
 
     return { uNodes: layoutedNodes, uEdges: layoutedEdges };
-  }, [viewMode, levels, texts]);
+  }, [viewMode, levels, texts, refreshTrigger]);
 
   const { onExportImage, onSave, onClear, onExportJSON, onImportJSON, exportToCSV, onExportPDF, isGeneratingPDF, handleImageUpload } = useFileHandlers({ nodes: levels.flatMap(l => l.nodes), edges: levels.flatMap(l => l.edges), levels, activeLevelId, projectData, setNodes, setEdges, setProjectData, setActiveLevelId, takeSnapshot, reactFlowWrapper, texts, lang });
 
@@ -339,23 +380,68 @@ function Editor() {
       case 'editor': return (
         <StandardContext.Provider value={standard}>
           <div style={{ display: 'flex', width: '100%', height: '100vh', cursor: isDrawingWall ? 'crosshair' : 'default', backgroundColor: 'var(--bg-color)', color: 'var(--text-color)', overflow: 'hidden' }}>
-            {isSidebarOpen && (
+            {viewMode === 'plan' && isSidebarOpen && (
               <Sidebar lang={lang} setLang={setLang} texts={texts} isDrawingWall={isDrawingWall} setIsDrawingWall={setIsDrawingWall} onExportImage={onExportImage} onSave={onSave} onClear={onClear} onExportJSON={onExportJSON} onImportJSON={onImportJSON} onExportPDF={() => onExportPDF(uNodes, uEdges, materialCounts)} viewMode={viewMode} theme={theme} setTheme={setTheme} onSettingsClick={() => setIsSettingsModalOpen(true)} activeCircuit={activeMainCircuit} setActiveCircuit={setActiveMainCircuit} isGeneratingPDF={isGeneratingPDF} onProfileClick={() => setCurrentPage('profile')} />
             )}
             <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} theme={theme} setTheme={setTheme} lang={lang} setLang={setLang} texts={texts} projectData={projectData} setProjectData={setProjectData} />
             <div className={projectData.showDimensions === false ? "hide-room-dimensions" : ""} style={{ flexGrow: 1, height: '100%', background: projectData.canvasBgColor || 'var(--bg-color)', position: 'relative', overflow: 'hidden' }} ref={reactFlowWrapper}>
-              <button className="no-print" onClick={() => setIsSidebarOpen(!isSidebarOpen)} style={{ position: 'absolute', top: '15px', left: '15px', zIndex: 10, ...toggleButtonStyle }}>{isSidebarOpen ? '⬅️' : '➡️ 🛠️'}</button>
-              <button className="no-print" onClick={() => setIsPropertiesOpen(!isPropertiesOpen)} style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 10, ...toggleButtonStyle }}>{isPropertiesOpen ? '➡️' : '📝 ⬅️'}</button>
+              
+              {viewMode === 'plan' && (
+                <button className="no-print" onClick={() => setIsSidebarOpen(!isSidebarOpen)} style={{ position: 'absolute', top: '15px', left: '15px', zIndex: 10, ...toggleButtonStyle }}>{isSidebarOpen ? '⬅️' : '➡️ 🛠️'}</button>
+              )}
+              {viewMode === 'plan' && (
+                <button className="no-print" onClick={() => setIsPropertiesOpen(!isPropertiesOpen)} style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 10, ...toggleButtonStyle }}>{isPropertiesOpen ? '➡️' : '📝 ⬅️'}</button>
+              )}
+
               <div className="no-print" style={{ position: 'absolute', top: '15px', left: '50%', transform: 'translateX(-50%)', zIndex: 10, display: 'flex', gap: '15px', background: 'var(--panel-bg)', padding: '5px 10px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', alignItems: 'center', border: '1px solid var(--border)' }}>
-                <LevelManager levels={levels} activeLevelId={activeLevelId} setActiveLevelId={setActiveLevelId} addLevel={addLevel} deleteLevel={deleteLevel} renameLevel={renameLevel} texts={texts} />
-                <div style={{ width: '1px', height: '24px', background: 'var(--border)' }}></div>
+                {viewMode === 'plan' && (
+                  <>
+                    <LevelManager levels={levels} activeLevelId={activeLevelId} setActiveLevelId={setActiveLevelId} addLevel={addLevel} deleteLevel={deleteLevel} renameLevel={renameLevel} texts={texts} />
+                    <div style={{ width: '1px', height: '24px', background: 'var(--border)' }}></div>
+                  </>
+                )}
+                
                 <button onClick={() => setViewMode('plan')} style={{ padding: '5px 15px', borderRadius: '4px', border: 'none', background: viewMode === 'plan' ? 'var(--button-primary-bg)' : 'transparent', color: viewMode === 'plan' ? '#fff' : 'var(--text-color)', fontWeight: 'bold', cursor: 'pointer' }}>{texts.view_plan}</button>
                 <button onClick={() => setViewMode('unifilaire')} style={{ padding: '5px 15px', borderRadius: '4px', border: 'none', background: viewMode === 'unifilaire' ? 'var(--button-primary-bg)' : 'transparent', color: viewMode === 'unifilaire' ? '#fff' : 'var(--text-color)', fontWeight: 'bold', cursor: 'pointer' }}>{texts.view_unifilaire}</button>
+                
+                {viewMode === 'unifilaire' && (
+                  <button onClick={() => setRefreshTrigger(r => r + 1)} style={{ padding: '5px 15px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--item-bg)', color: 'var(--text-color)', fontWeight: 'bold', cursor: 'pointer' }}>🔄 Rafraîchir</button>
+                )}
+                
                 <div style={{ width: '1px', height: '24px', background: 'var(--border)' }}></div>
                 <button onClick={undo} disabled={!canUndo} style={{ background: 'var(--item-bg)', border: '1px solid var(--border)', color: 'var(--text-color)', borderRadius: '4px', padding: '5px 10px', cursor: !canUndo ? 'not-allowed' : 'pointer', fontWeight: 'bold', opacity: !canUndo ? 0.5 : 1 }}>↩️</button>
                 <button onClick={redo} disabled={!canRedo} style={{ background: 'var(--item-bg)', border: '1px solid var(--border)', color: 'var(--text-color)', borderRadius: '4px', padding: '5px 10px', cursor: !canRedo ? 'not-allowed' : 'pointer', fontWeight: 'bold', opacity: !canRedo ? 0.5 : 1 }}>↪️</button>
+                
+                {viewMode === 'unifilaire' && (
+                  <>
+                    <div style={{ width: '1px', height: '24px', background: 'var(--border)' }}></div>
+                    <button onClick={() => onExportPDF(uNodes, uEdges, materialCounts)} disabled={isGeneratingPDF} style={{ padding: '5px 15px', borderRadius: '4px', border: 'none', background: '#28a745', color: '#fff', fontWeight: 'bold', cursor: isGeneratingPDF ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      {isGeneratingPDF ? '⏳ ...' : texts.export_pdf}
+                    </button>
+                  </>
+                )}
               </div>
-              <ReactFlow nodes={viewMode === 'plan' ? nodes : uNodes} edges={viewMode === 'plan' ? edges : uEdges} onNodesChange={viewMode === 'plan' ? onNodesChange : undefined} onNodesDelete={viewMode === 'plan' ? onNodesDelete : undefined} onEdgesChange={viewMode === 'plan' ? setEdges : undefined} onConnect={onConnect} onDrop={onDrop} onDragOver={(e) => e.preventDefault()} nodeTypes={nodeTypes} onPaneClick={onPaneClick} onPaneMouseMove={onPaneMouseMove} onNodeDoubleClick={onNodeDoubleClick} onNodeDragStop={viewMode === 'plan' ? onNodeDragStop : undefined} nodesDraggable={viewMode === 'plan'} nodesConnectable={viewMode === 'plan'} elementsSelectable={viewMode === 'plan'} snapToGrid={true} snapGrid={[15, 15]} fitView>
+              <ReactFlow 
+                nodes={viewMode === 'plan' ? nodes : uNodes} 
+                edges={viewMode === 'plan' ? edges : uEdges} 
+                onNodesChange={viewMode === 'plan' ? onNodesChange : undefined} 
+                onNodesDelete={viewMode === 'plan' ? onNodesDelete : undefined} 
+                onEdgesChange={viewMode === 'plan' ? setEdges : undefined} 
+                onConnect={onConnect} 
+                onDrop={onDrop} 
+                onDragOver={(e) => e.preventDefault()} 
+                nodeTypes={nodeTypes} 
+                onPaneClick={onPaneClick} 
+                onPaneMouseMove={onPaneMouseMove} 
+                onNodeDoubleClick={onNodeDoubleClick} 
+                onNodeDragStop={viewMode === 'plan' ? onNodeDragStop : undefined} 
+                nodesDraggable={viewMode === 'plan'} 
+                nodesConnectable={viewMode === 'plan'} 
+                elementsSelectable={true} 
+                snapToGrid={true} 
+                snapGrid={[15, 15]} 
+                fitView
+              >
                 <Background variant="dots" color={theme === 'dark' ? '#555' : '#ccc'} gap={15} size={2} />
                 <Controls />
                 {projectData.showCartouche && (
@@ -371,7 +457,7 @@ function Editor() {
                 )}
               </ReactFlow>
             </div>
-            {isPropertiesOpen && (
+            {viewMode === 'plan' && isPropertiesOpen && (
               <div className="no-print" style={{ width: '250px', height: '100%', background: 'var(--sidebar-bg)', color: 'var(--text-color)', borderLeft: '1px solid var(--sidebar-border)', padding: '15px', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
                 {selectedNodes.length > 1 ? (
                   <>

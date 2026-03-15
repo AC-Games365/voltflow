@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" style="stroke-linejoin:bevel;stroke:#000000;stroke-linecap:square;fill:none" viewBox="311.760009765625 595.510009765625 39.52001953125 27.67999267578125"><g id="g6276" font-size="11" font-weight="400">
+      <g id="g830" style="stroke-linejoin:bevel;stroke:#000000;stroke-linecap:square;fill:#ffffff" transform="matrix(1.184 0 0 1.184 325.6 621.19)">
+        <path id="path832" d="m4.5-10c0 2.4853-2.0147 4.5-4.5 4.5s-4.5-2.0147-4.5-4.5 2.0147-4.5 4.5-4.5 4.5 2.0147 4.5 4.5" style="fill:#ffffff" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" inkscape:connector-curvature="0"/>
+      </g>
+      <g id="g810" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:#000000" transform="matrix(1.184 0 0 1.184 325.6 621.19)" stroke-miterlimit="2">
+        <path id="path812" d="m18-7v2l2-2-2-2v2" style="fill-rule:evenodd" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" inkscape:connector-curvature="0"/>
+        <polyline id="polyline814" style="fill:none" points="8 -7 18 -7"/>
+      </g>
+      <g id="g816" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:#000000" transform="matrix(1.184 0 0 1.184 325.6 621.19)" stroke-miterlimit="2">
+        <path id="path818" d="m18-13v2l2-2-2-2v2" style="fill-rule:evenodd" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" inkscape:connector-curvature="0"/>
+        <polyline id="polyline820" style="fill:none" points="8 -13 18 -13"/>
+      </g>
+      <g id="g822" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" transform="matrix(1.184 0 0 1.184 325.6 621.19)" stroke-miterlimit="2">
+        <polyline id="polyline824" style="fill:none" points="-3 -13 3 -7"/>
+      </g>
+      <g id="g826" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" transform="matrix(1.184 0 0 1.184 325.6 621.19)" stroke-miterlimit="2">
+        <polyline id="polyline828" style="fill:none" points="-3 -7 3 -13"/>
+      </g>
+      <g id="g834" style="stroke-linejoin:bevel;stroke:#000000;stroke-linecap:square;fill:none" transform="matrix(1.184 0 0 1.184 325.6 621.19)">
+        <path id="path836" d="m0 0c-5.5228 0-10-4.4772-10-10s4.4772-10 10-10" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" inkscape:connector-curvature="0"/>
+      </g>
+    </g></svg>

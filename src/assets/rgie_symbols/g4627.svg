@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" style="stroke-linejoin:bevel;stroke:#000000;stroke-linecap:square;fill:none" viewBox="179.15200805664062 330.7099914550781 32.41600036621094 21.760009765625"><g id="g4627" font-size="11" font-weight="400">
+      <g id="g1070" style="stroke-linejoin:bevel;stroke:#000000;stroke-linecap:square;fill:#ffffff" transform="matrix(1.184 0 0 1.184 195.36 332.71)">
+        <path id="path1072" d="m-12 0v15h24v-15h-24" style="fill-rule:evenodd;fill:#ffffff" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" inkscape:connector-curvature="0"/>
+      </g>
+      <g id="g1078" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" transform="matrix(1.184 0 0 1.184 195.36 332.71)" stroke-miterlimit="2">
+        <polyline id="polyline1080" style="fill:none" points="-12 4.5 12 4.5" vector-effect="non-scaling-stroke"/>
+      </g>
+      <g id="g1082" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" transform="matrix(1.184 0 0 1.184 195.36 332.71)" stroke-miterlimit="2">
+        <polyline id="polyline1084" style="fill:none" points="-12 3 12 3" vector-effect="non-scaling-stroke"/>
+      </g>
+      <g id="g1086" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" transform="matrix(1.184 0 0 1.184 195.36 332.71)" stroke-miterlimit="2">
+        <polyline id="polyline1088" style="fill:none" points="-12 1.5 12 1.5" vector-effect="non-scaling-stroke"/>
+      </g>
+    </g></svg>

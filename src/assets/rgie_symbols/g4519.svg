@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" style="stroke-linejoin:bevel;stroke:#000000;stroke-linecap:square;fill:none" viewBox="179.15200805664062 246.64601135253906 32.41600036621094 32.41600036621094"><g id="g4519" font-size="11" font-weight="400">
+      <g id="g238" style="stroke-linejoin:bevel;stroke:#000000;stroke-linecap:square;fill:#ffffff" transform="matrix(1.184 0 0 1.184 195.36 249.83)">
+        <path id="path240" style="fill-rule:evenodd;fill:#ffffff" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" inkscape:connector-curvature="0" d="m-12-1v24h24v-24h-24"/>
+      </g>
+      <g id="g222" transform="matrix(1.184 0 0 1.184 195.36 249.83)" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" stroke-miterlimit="2">
+        <polyline id="polyline224" style="fill:none" points="12 -1 -12 23"/>
+      </g>
+      <g id="g226" transform="matrix(1.184 0 0 1.184 195.36 249.83)" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" stroke-miterlimit="2">
+        <polyline id="polyline228" style="fill:none" points="-12 -1 12 23"/>
+      </g>
+      <g id="g230" style="stroke-linejoin:bevel;stroke:#000000;stroke-linecap:square;fill:#ffffff" transform="matrix(1.184 0 0 1.184 195.36 249.83)">
+        <path id="path232" style="fill-rule:evenodd" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" inkscape:connector-curvature="0" d="m9 11c0 4.9706-4.0294 9-9 9s-9-4.0294-9-9 4.0294-9 9-9 9 4.0294 9 9"/>
+      </g>
+      <g id="g234" transform="matrix(1.184 0 0 1.184 195.36 249.83)" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" stroke-miterlimit="2">
+        <polyline id="polyline236" style="fill:none" points="-2.3114 14.778 3.6885 8.7774" vector-effect="non-scaling-stroke"/>
+      </g>
+      <g id="g242" transform="matrix(1.184 0 0 1.184 195.36 249.83)" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" stroke-miterlimit="2">
+        <polyline id="polyline244" style="fill:none" points="-3.822 13.044 2.1779 7.0444" vector-effect="non-scaling-stroke"/>
+      </g>
+      <g id="g246" transform="matrix(1.184 0 0 1.184 195.36 249.83)" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" stroke-miterlimit="2">
+        <polyline id="polyline248" style="fill:none" points="-4.2669 11.733 0.733 6.7329" vector-effect="non-scaling-stroke"/>
+      </g>
+      <g id="g254" style="stroke-linejoin:bevel;stroke:#000000;stroke-linecap:square;fill:none" transform="matrix(1.184 0 0 1.184 195.36 249.83)">
+        <path id="path256" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" inkscape:connector-curvature="0" vector-effect="non-scaling-stroke" d="m4.4721 11c0 2.4699-2.0022 4.4721-4.4721 4.4721s-4.4721-2.0022-4.4721-4.4721 2.0022-4.4721 4.4721-4.4721 4.4721 2.0022 4.4721 4.4721"/>
+      </g>
+      <g id="g258" transform="matrix(1.184 0 0 1.184 195.36 249.83)" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" stroke-miterlimit="2">
+        <polyline id="polyline260" style="fill:none" points="-4 9.9999 -0.9999 6.9999" vector-effect="non-scaling-stroke"/>
+      </g>
+      <g id="g262" transform="matrix(1.184 0 0 1.184 195.36 249.83)" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" stroke-miterlimit="2">
+        <polyline id="polyline264" style="fill:none" points="1 15 4 12" vector-effect="non-scaling-stroke"/>
+      </g>
+      <g id="g266" transform="matrix(1.184 0 0 1.184 195.36 249.83)" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" stroke-miterlimit="2">
+        <polyline id="polyline268" style="fill:none" points="-0.9999 15.044 4 10.044" vector-effect="non-scaling-stroke"/>
+      </g>
+      <g id="g270" transform="matrix(1.184 0 0 1.184 195.36 249.83)" style="stroke-linejoin:miter;stroke:#000000;stroke-linecap:square;stroke-miterlimit:2;fill:none" stroke-miterlimit="2">
+        <polyline id="polyline272" style="fill:none" points="-3 14 3 7.9999" vector-effect="non-scaling-stroke"/>
+      </g>
+    </g></svg>
