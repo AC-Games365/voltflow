@@ -37,11 +37,11 @@ const RoomNode = ({ data, selected, width, height }) => {
             <NodeResizer color="#009688" isVisible={selected} minWidth={50} minHeight={50} />
         )}
 
-        <div style={{ width: `${w}px`, height: `${h}px`, position: 'relative' }}>
+        <div style={{ width: `${w}px`, height: `${h}px`, position: 'relative', pointerEvents: 'none' }}>
 
           {/* Le fond de la pièce : Un SVG qui épouse la forme parfaite ! */}
           <svg
-              style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
+              style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}
               width={w}
               height={h}
           >
@@ -49,10 +49,11 @@ const RoomNode = ({ data, selected, width, height }) => {
                 <polygon
                     points={pointsString}
                     fill={data?.color || '#009688'}
-                    fillOpacity={0.2}
+                    fillOpacity={selected ? 0.4 : 0.2}
                     stroke={selected ? '#009688' : 'transparent'}
                     strokeWidth="2"
                     strokeDasharray="4 4"
+                    style={{ pointerEvents: 'all', cursor: 'pointer' }} // Rendre le polygone cliquable
                 />
             ) : (
                 /* Fallback au cas où ce serait une pièce dessinée manuellement (rectangle classique) */
@@ -60,11 +61,12 @@ const RoomNode = ({ data, selected, width, height }) => {
                     width={w}
                     height={h}
                     fill={data?.color || '#009688'}
-                    fillOpacity={0.2}
+                    fillOpacity={selected ? 0.4 : 0.2}
                     stroke={selected ? '#009688' : 'transparent'}
                     strokeWidth="2"
                     strokeDasharray="4 4"
                     rx="4"
+                    style={{ pointerEvents: 'all', cursor: 'pointer' }}
                 />
             )}
           </svg>

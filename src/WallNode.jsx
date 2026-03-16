@@ -1,60 +1,89 @@
 import { memo } from 'react';
-import { NodeResizer } from 'reactflow';
 
-const WallNode = ({ id, data, selected, width, height }) => {
+const handleStyle = {
+  width: 14,
+  height: 14,
+  borderRadius: '50%',
+  background: '#3182CE',
+  border: '2px solid white',
+  boxShadow: '0 0 5px rgba(0,0,0,0.2)',
+  cursor: 'crosshair',
+  position: 'absolute',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  zIndex: 100,
+  pointerEvents: 'auto',
+};
+
+const WallNode = ({ id, data, selected }) => {
   const isPreview = id === 'wall_preview';
   const rotation = data?.rotation || 0;
-  const length = data?.length || Math.max(width || 15, height || 15);
+  const length = data?.length || 0;
+  const thickness = data?.thickness || 15;
+  const showDimensions = data?.showWallDimensions !== false; 
+
+  const handleMouseDown = (e, handleType) => {
+    e.stopPropagation();
+    e.preventDefault();
+    window.dispatchEvent(new CustomEvent('startWallResize', { detail: { nodeId: id, handleType } }));
+  };
 
   return (
       <div style={{
         transform: `rotate(${rotation}deg)`,
-        transformOrigin: '0% 50%',
-        width: '100%',
-        height: '100%',
+        // L'origine de la rotation est le centre gauche de l'intersection
+        transformOrigin: `${thickness / 2}px 50%`,
+        // La div visuelle est allongée pour chevaucher parfaitement les coins à 90°
+        width: `${length + thickness}px`,
+        height: `${thickness}px`,
         position: 'absolute',
-        top: 0,
-        left: 0,
-        borderRadius: '8px', // Adoucit les coins aux intersections
+        // Décalé à gauche pour que le "vrai" point de départ soit à x=0
+        left: `-${thickness / 2}px`,
+        pointerEvents: isPreview ? 'none' : 'auto' 
       }}>
-        <NodeResizer
-            color="#3182CE"
-            isVisible={selected && !isPreview}
-            minWidth={15}
-            minHeight={15}
-        />
+        {selected && !isPreview && (
+            <>
+              <div
+                  className="custom-wall-handle nodrag"
+                  onMouseDown={(e) => handleMouseDown(e, 'start')}
+                  style={{...handleStyle, left: thickness / 2 - 7}} // Positionné exactement sur le nœud A
+              />
+              <div
+                  className="custom-wall-handle nodrag"
+                  onMouseDown={(e) => handleMouseDown(e, 'end')}
+                  style={{...handleStyle, right: thickness / 2 - 7}} // Positionné exactement sur le nœud B
+              />
+            </>
+        )}
 
         <div style={{
           width: '100%',
           height: '100%',
-          // Pas de bordure sur les vrais murs pour qu'ils "fusionnent" visuellement
           background: isPreview ? 'rgba(49, 130, 206, 0.4)' : '#334155',
           border: isPreview ? '2px dashed #3182CE' : 'none',
-          borderRadius: '8px',
-          position: 'relative',
           boxSizing: 'border-box',
+          pointerEvents: isPreview ? 'none' : 'auto'
         }}>
-
-          {/* Badge de mesure centré avec effet "flottant" */}
-          <div style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            // translate(-50%, -50%) centre l'élément, rotate(-rotation) annule la rotation du mur
-            transform: `translate(-50%, -50%) rotate(${-rotation}deg)`,
-            background: '#ffffff',
-            color: '#1A202C',
-            padding: '2px 8px',
-            borderRadius: '12px',
-            fontSize: '12px',
-            fontWeight: 'bold',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
-            zIndex: 10,
-          }}>
-            {length} cm
-          </div>
+          {(showDimensions || isPreview) && (
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: `translate(-50%, -50%) rotate(${-rotation}deg)`,
+                background: '#ffffff',
+                color: '#1A202C',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+                zIndex: 10,
+              }}>
+                {Math.round(length)} cm
+              </div>
+          )}
         </div>
       </div>
   );

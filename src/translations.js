@@ -153,6 +153,10 @@ export const t = {
     profile_status_ongoing: 'En cours',
     profile_status_done: 'Terminé',
     profile_modified: 'Modifié le',
+    
+    show_wall_dimensions: 'Afficher les dimensions des murs',
+    is_wall_linking_enabled: 'Mode Magnétique / Murs Liés',
+    wall_too_short: 'Le mur est trop court ou superposé.',
   },
   en: {
     // --- EDITOR ---
@@ -308,5 +312,9 @@ export const t = {
     profile_status_ongoing: 'Ongoing',
     profile_status_done: 'Done',
     profile_modified: 'Modified on',
+
+    show_wall_dimensions: 'Show Wall Dimensions',
+    is_wall_linking_enabled: 'Magnetic Mode / Linked Walls',
+    wall_too_short: 'The wall is too short or overlapping.',
   }
 };

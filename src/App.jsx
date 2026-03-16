@@ -18,7 +18,6 @@ import { useUndoRedo } from './hooks/useUndoRedo.js';
 import { useFileHandlers } from './hooks/useFileHandlers.js';
 import { useWallDrawer } from './hooks/useWallDrawer.js';
 import { useNodeManagement } from './hooks/useNodeManagement.js';
-// --- NOUVEAU : Import du hook pour détecter les pièces ---
 import { useRoomDetector } from './hooks/useRoomDetector.js';
 import { getLayoutedElements } from './layout.js';
 
@@ -91,7 +90,7 @@ const initialPlan = {
     projectName: '', clientName: '', clientAddress: '', installerName: '',
     date: new Date().toISOString().split('T')[0],
     showCartouche: false, showDimensions: true, showLegend: true, canvasBgColor: '#f0f0f0',
-    standard: 'be'
+    standard: 'be', showWallDimensions: true, isWallLinkingEnabled: true
   }
 };
 
@@ -108,6 +107,12 @@ const getSavedPlan = (currentUser) => {
       if (!projectData.installerName && currentUser?.name) {
         projectData.installerName = currentUser.name;
       }
+      if(projectData.showWallDimensions === undefined) {
+          projectData.showWallDimensions = true;
+      }
+      if(projectData.isWallLinkingEnabled === undefined) {
+          projectData.isWallLinkingEnabled = true;
+      }
       return { ...initialPlan, ...parsed, projectData };
     } catch (e) { console.error("Erreur chargement", e); }
   }
@@ -118,14 +123,42 @@ const getSavedPlan = (currentUser) => {
   return { ...initialPlan, projectData: newProjectData };
 };
 
+const Toast = ({ message, onClose }) => {
+    useEffect(() => {
+        const timer = setTimeout(onClose, 3000);
+        return () => clearTimeout(timer);
+    }, [message, onClose]);
+
+    if (!message) return null;
+
+    return (
+        <div style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#E53E3E',
+            color: 'white',
+            padding: '10px 20px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            zIndex: 1000,
+            fontWeight: 'bold',
+            animation: 'fadeIn 0.3s ease-in-out'
+        }}>
+            {message}
+        </div>
+    );
+};
+
+
 function Editor() {
   const { fitView } = useReactFlow();
   const reactFlowWrapper = useRef(null);
   const [lang, setLang] = useState('fr');
   const [theme, setTheme] = useState(localStorage.getItem('voltflow-theme') || 'light');
-  const texts = t[lang];
+  const texts = t[lang] || t['fr'];
 
-  // Memoize nodeTypes pour éviter le warning React Flow
   const nodeTypes = useMemo(() => initialNodeTypes, []);
 
   const [currentUser, setCurrentUser] = useState({ name: 'Jean Dupont', email: 'jean.dupont@exemple.com' });
@@ -136,7 +169,9 @@ function Editor() {
   const [viewMode, setViewMode] = useState('plan');
   const [isDrawingWall, setIsDrawingWall] = useState(false);
   const [activeMainCircuit, setActiveMainCircuit] = useState('A');
-  const [refreshTrigger, setRefreshTrigger] = useState(0); // Trigger force refresh
+  const [refreshTrigger, setRefreshTrigger] = useState(0); 
+  
+  const [errorMessage, setErrorMessage] = useState(null); 
 
   const { state, setState, takeSnapshot, undo, redo, canUndo, canRedo } = useUndoRedo(getSavedPlan(currentUser));
   const { levels, activeLevelId, projectData } = state;
@@ -144,24 +179,28 @@ function Editor() {
 
   const activeLevel = useMemo(() => levels.find(l => l.id === activeLevelId) || levels[0], [levels, activeLevelId]);
 
-  // Nœuds de base (murs, symboles, etc. dessinés par l'utilisateur)
   const nodes = activeLevel.nodes;
   const edges = activeLevel.edges;
 
-  // --- NOUVEAU : Détection automatique des pièces et fusion avec le plan ---
   const detectedRooms = useRoomDetector(nodes);
 
-  // On place detectedRooms en premier pour qu'ils soient affichés en arrière-plan (sous les murs)
-  const planNodes = useMemo(() => [...detectedRooms, ...nodes], [detectedRooms, nodes]);
-  // --------------------------------------------------------------------------
+  const mappedNodes = useMemo(() => nodes.map(n => {
+    if(n.type === 'wall' || n.id === 'wall_preview') {
+      return {...n, data: {...n.data, showWallDimensions: projectData.showWallDimensions !== false}}
+    }
+    return n;
+  }), [nodes, projectData.showWallDimensions]);
 
-  // Réajuster la vue lors du changement de mode (plan <-> unifilaire)
+  const planNodes = useMemo(() => [...detectedRooms, ...mappedNodes], [detectedRooms, mappedNodes]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      fitView({ padding: 0.2, duration: 500 });
+      if (!isDrawingWall) {
+         fitView({ padding: 0.2, duration: 500 });
+      }
     }, 100);
     return () => clearTimeout(timer);
-  }, [viewMode, fitView, refreshTrigger]);
+  }, [viewMode, refreshTrigger, fitView]);
 
   const setNodes = useCallback((newNodes) => {
     setState(cs => ({
@@ -214,8 +253,24 @@ function Editor() {
 
   const { onNodesChange, onNodesDelete, onNodeDragStop, onConnect, onDrop, updateNodeData, updateNodeProperty, updateNodeStyle, updateEdgeLabel, updateEdgeColor, updateEdgeArrow, updateEdgeType, onGroup, onUngroup, onDuplicate } = useNodeManagement({ nodes, levels, setNodes, setEdges, takeSnapshot, selectedNodes, selectedNode, selectedEdge, activeCircuit: activeMainCircuit, setActiveCircuit, setState });
 
-  // --- Le WallDrawer reçoit bien les `nodes` (utilisateurs) et pas planNodes pour ne pas s'embrouiller ---
-  const { onPaneClick, onPaneMouseMove, onPaneContextMenu } = useWallDrawer({ isDrawingWall, setIsDrawingWall, nodes, setNodes, takeSnapshot, texts });
+  // On récupère TOUS les événements générés par notre hook personnalisé
+  const { 
+    onPaneClick,
+    onPaneMouseMove,
+    onPaneContextMenu,
+    onNodeClick,
+    onNodeDragStart
+  } = useWallDrawer({ 
+      isDrawingWall, 
+      setIsDrawingWall, 
+      nodes, 
+      setNodes, 
+      takeSnapshot, 
+      reactFlowWrapper, 
+      setErrorMessage, 
+      texts,
+      isWallLinkingEnabled: projectData.isWallLinkingEnabled
+  });
 
   const materialCounts = useMemo(() => {
     const counts = {};
@@ -233,7 +288,6 @@ function Editor() {
     const initialEdges = [];
     const circuits = {};
 
-    // Forcer le recalcule
     const _ = refreshTrigger;
 
     levels.forEach(level => {
@@ -390,12 +444,20 @@ function Editor() {
       case 'profile': return <Profile onLogout={() => { setCurrentUser(null); setCurrentPage('home'); }} onBackToEditor={() => setCurrentPage('editor')} currentUser={currentUser} texts={texts} />;
       case 'editor': return (
           <StandardContext.Provider value={standard}>
-            <div style={{ display: 'flex', width: '100%', height: '100vh', cursor: isDrawingWall ? 'crosshair' : 'default', backgroundColor: 'var(--bg-color)', color: 'var(--text-color)', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', width: '100%', height: '100vh', cursor: isDrawingWall ? 'crosshair' : 'default', backgroundColor: 'var(--bg-color)', color: 'var(--text-color)', overflow: 'hidden' }}
+                 >
               {viewMode === 'plan' && isSidebarOpen && (
                   <Sidebar lang={lang} setLang={setLang} texts={texts} isDrawingWall={isDrawingWall} setIsDrawingWall={setIsDrawingWall} onExportImage={onExportImage} onSave={onSave} onClear={onClear} onExportJSON={onExportJSON} onImportJSON={onImportJSON} onExportPDF={() => onExportPDF(uNodes, uEdges, materialCounts)} viewMode={viewMode} theme={theme} setTheme={setTheme} onSettingsClick={() => setIsSettingsModalOpen(true)} activeCircuit={activeMainCircuit} setActiveCircuit={setActiveMainCircuit} isGeneratingPDF={isGeneratingPDF} onProfileClick={() => setCurrentPage('profile')} />
               )}
               <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} theme={theme} setTheme={setTheme} lang={lang} setLang={setLang} texts={texts} projectData={projectData} setProjectData={setProjectData} />
-              <div className={projectData.showDimensions === false ? "hide-room-dimensions" : ""} style={{ flexGrow: 1, height: '100%', background: projectData.canvasBgColor || 'var(--bg-color)', position: 'relative', overflow: 'hidden' }} ref={reactFlowWrapper}>
+              
+              <div 
+                 className={projectData.showDimensions === false ? "hide-room-dimensions" : ""} 
+                 style={{ flexGrow: 1, height: '100%', background: projectData.canvasBgColor || 'var(--bg-color)', position: 'relative', overflow: 'hidden' }} 
+                 ref={reactFlowWrapper}
+              >
+
+                {errorMessage && <Toast message={errorMessage} onClose={() => setErrorMessage(null)} />}
 
                 {viewMode === 'plan' && (
                     <button className="no-print" onClick={() => setIsSidebarOpen(!isSidebarOpen)} style={{ position: 'absolute', top: '15px', left: '15px', zIndex: 10, ...toggleButtonStyle }}>{isSidebarOpen ? '⬅️' : '➡️ 🛠️'}</button>
@@ -433,7 +495,6 @@ function Editor() {
                   )}
                 </div>
                 <ReactFlow
-                    // --- NOUVEAU : On utilise planNodes (murs + pièces) au lieu de nodes ---
                     nodes={viewMode === 'plan' ? planNodes : uNodes}
                     edges={viewMode === 'plan' ? edges : uEdges}
                     onNodesChange={viewMode === 'plan' ? onNodesChange : undefined}
@@ -443,9 +504,13 @@ function Editor() {
                     onDrop={onDrop}
                     onDragOver={(e) => e.preventDefault()}
                     nodeTypes={nodeTypes}
+
                     onPaneClick={onPaneClick}
                     onPaneMouseMove={onPaneMouseMove}
-                    onPaneContextMenu={onPaneContextMenu} // <--- Important pour l'annulation (clic droit)
+                    onPaneContextMenu={onPaneContextMenu}
+                    onNodeClick={onNodeClick}
+                    onNodeDragStart={onNodeDragStart}
+
                     onNodeDoubleClick={onNodeDoubleClick}
                     onNodeDragStop={viewMode === 'plan' ? onNodeDragStop : undefined}
                     nodesDraggable={viewMode === 'plan'}
@@ -453,7 +518,6 @@ function Editor() {
                     elementsSelectable={true}
                     snapToGrid={true}
                     snapGrid={[15, 15]}
-                    fitView
                 >
                   <Background variant="dots" color={theme === 'dark' ? '#555' : '#ccc'} gap={15} size={2} />
                   <Controls />
@@ -505,7 +569,13 @@ function Editor() {
                           )}
                           {selectedNode && selectedNode.type === 'breaker' && (<div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.amperage}</label><input type="text" value={selectedNode.data?.amperage || ''} onFocus={takeSnapshot} onChange={(e) => updateNodeData('amperage', e.target.value)} style={{ width: '100%', padding: '5px' }}/></div>)}
                           {selectedNode && ['light', 'spotlight', 'wall_light', 'socket', 'socket_double', 'socket_triple', 'door', 'window', 'switch', 'switch_two_way', 'push_button', 'rj45', 'thermostat', 'camera'].includes(selectedNode.type) && (<div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.rotation}</label><input type="number" step="90" value={selectedNode.data?.rotation || 0} onFocus={takeSnapshot} onChange={(e) => updateNodeData('rotation', parseInt(e.target.value, 10) || 0)} style={{ width: '100%', padding: '5px' }}/></div>)}
-                          {selectedNode && selectedNode.type === 'wall' && (<><div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.wall_length}</label><input type="number" value={selectedNode.style?.width > selectedNode.style?.height ? selectedNode.style?.width : selectedNode.style?.height || 0} onFocus={takeSnapshot} onChange={(e) => updateNodeStyle(selectedNode.style?.width > selectedNode.style?.height ? 'width' : 'height', parseInt(e.target.value, 10) || 15)} style={{ width: '100%', padding: '5px' }}/></div><div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.wall_thickness}</label><input type="number" value={selectedNode.style?.width > selectedNode.style?.height ? selectedNode.style?.height : selectedNode.style?.width || 0} onFocus={takeSnapshot} onChange={(e) => updateNodeStyle(selectedNode.style?.width > selectedNode.style?.height ? 'height' : 'width', parseInt(e.target.value, 10) || 15)} style={{ width: '100%', padding: '5px' }}/></div></>)}
+                          
+                          {selectedNode && selectedNode.type === 'wall' && (
+                            <>
+                                <div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.wall_thickness}</label><input type="number" value={selectedNode.data?.thickness || 15} onFocus={takeSnapshot} onChange={(e) => updateNodeData('thickness', parseInt(e.target.value, 10) || 15)} style={{ width: '100%', padding: '5px' }}/></div>
+                            </>
+                          )}
+
                           {selectedNode && selectedNode.type === 'text' && (<div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.font_size}</label><input type="number" value={selectedNode.data?.fontSize || 20} onFocus={takeSnapshot} onChange={(e) => updateNodeData('fontSize', parseInt(e.target.value, 10) || 20)} style={{ width: '100%', padding: '5px' }}/></div>)}
                           {selectedNode && ['wall', 'room', 'text'].includes(selectedNode.type) && (<div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.color}</label><input type="color" value={selectedNode.data?.color || '#333333'} onFocus={takeSnapshot} onChange={(e) => updateNodeData('color', e.target.value)} style={{ width: '100%', padding: '0', border: 'none', height: '30px' }}/></div>)}
                           {selectedNode && (<div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '15px', paddingTop: '15px', borderTop: '1px solid var(--border)' }}><input type="checkbox" id="lockPos" checked={selectedNode.draggable === false} onFocus={takeSnapshot} onChange={(e) => updateNodeProperty('draggable', !e.target.checked)} /><label htmlFor="lockPos" style={{ fontSize: '12px', opacity: 0.7 }}>{texts.lock}</label></div>)}
@@ -518,8 +588,20 @@ function Editor() {
                           <div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.client_address}</label><input type="text" value={projectData.clientAddress || ''} onFocus={takeSnapshot} onChange={(e) => setProjectData(pd => ({...pd, clientAddress: e.target.value}))} style={{ width: '100%', padding: '5px' }} /></div>
                           <div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.installer_name}</label><input type="text" value={projectData.installerName || ''} onFocus={takeSnapshot} onChange={(e) => setProjectData(pd => ({...pd, installerName: e.target.value}))} style={{ width: '100%', padding: '5px' }} /></div>
                           <div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.date}</label><input type="date" value={projectData.date || ''} onFocus={takeSnapshot} onChange={(e) => setProjectData(pd => ({...pd, date: e.target.value}))} style={{ width: '100%', padding: '5px' }} /></div>
+                          
                           <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}><input type="checkbox" id="showCartouche" checked={!!projectData.showCartouche} onFocus={takeSnapshot} onChange={(e) => setProjectData(pd => ({...pd, showCartouche: e.target.checked}))} /><label htmlFor="showCartouche" style={{ fontSize: '12px', opacity: 0.7 }}>{texts.show_cartouche}</label></div>
                           <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}><input type="checkbox" id="showDimensions" checked={!!projectData.showDimensions} onFocus={takeSnapshot} onChange={(e) => setProjectData(pd => ({...pd, showDimensions: e.target.checked}))} /><label htmlFor="showDimensions" style={{ fontSize: '12px', opacity: 0.7 }}>{texts.show_dimensions}</label></div>
+                          
+                          <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <input type="checkbox" id="isWallLinkingEnabled" checked={projectData.isWallLinkingEnabled !== false} onFocus={takeSnapshot} onChange={(e) => setProjectData(pd => ({...pd, isWallLinkingEnabled: e.target.checked}))} />
+                              <label htmlFor="isWallLinkingEnabled" style={{ fontSize: '12px', opacity: 0.7 }}>{texts.is_wall_linking_enabled || "Mode Magnétique / Murs Liés"}</label>
+                          </div>
+
+                          <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <input type="checkbox" id="showWallDimensions" checked={projectData.showWallDimensions !== false} onFocus={takeSnapshot} onChange={(e) => setProjectData(pd => ({...pd, showWallDimensions: e.target.checked}))} />
+                              <label htmlFor="showWallDimensions" style={{ fontSize: '12px', opacity: 0.7 }}>{texts.show_wall_dimensions || "Afficher les dimensions des murs"}</label>
+                          </div>
+
                           <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}><input type="checkbox" id="showLegend" checked={!!projectData.showLegend} onFocus={takeSnapshot} onChange={(e) => setProjectData(pd => ({...pd, showLegend: e.target.checked}))} /><label htmlFor="showLegend" style={{ fontSize: '12px', opacity: 0.7 }}>{texts.show_legend}</label></div>
                           <div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.canvas_bg_color}</label><input type="color" value={projectData.canvasBgColor || '#f0f0f0'} onFocus={takeSnapshot} onChange={(e) => setProjectData(pd => ({...pd, canvasBgColor: e.target.value}))} style={{ width: '100%', padding: '0', border: 'none', height: '30px' }} /></div>
                           <div style={{ marginBottom: '10px', marginTop: '20px', paddingTop: '15px', borderTop: '1px solid var(--border)' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px', fontWeight: 'bold' }}>{texts.import_plan}</label><input type="file" accept="image/*" onChange={handleImageUpload} style={{ width: '100%', fontSize: '12px' }} /></div>
