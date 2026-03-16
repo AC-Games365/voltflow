@@ -10,12 +10,12 @@ const RoomNode = ({ data, selected, width, height }) => {
     const poly = data?.polygon;
     if (!poly || poly.length < 3) return { isPolygon: false };
 
-    // 1. Convertir les coordonnées absolues (du plan) en coordonnées relatives (pour le SVG)
+    // Convertir les coordonnées absolues (du plan) en coordonnées relatives (pour le SVG interne au noeud)
     const minX = Math.min(...poly.map(p => p.x));
     const minY = Math.min(...poly.map(p => p.y));
     const pts = poly.map(p => `${p.x - minX},${p.y - minY}`).join(' ');
 
-    // 2. Calculer l'aire exacte du polygone avec la formule de Gauss (Shoelace formula)
+    // Formule de l'aire (Shoelace)
     let sum = 0;
     for (let i = 0; i < poly.length; i++) {
       const p1 = poly[i];
@@ -23,7 +23,6 @@ const RoomNode = ({ data, selected, width, height }) => {
       sum += (p1.x * p2.y) - (p2.x * p1.y);
     }
 
-    // Nos dimensions sont en cm, donc l'aire est en cm². On divise par 10000 pour les m².
     const areaCm2 = Math.abs(sum) / 2;
     const aM2 = (areaCm2 / 10000).toFixed(2);
 
@@ -32,14 +31,12 @@ const RoomNode = ({ data, selected, width, height }) => {
 
   return (
       <>
-        {/* On ne garde le Resizer que si ce n'est pas un polygone généré automatiquement */}
         {!isPolygon && (
             <NodeResizer color="#009688" isVisible={selected} minWidth={50} minHeight={50} />
         )}
 
         <div style={{ width: `${w}px`, height: `${h}px`, position: 'relative', pointerEvents: 'none' }}>
 
-          {/* Le fond de la pièce : Un SVG qui épouse la forme parfaite ! */}
           <svg
               style={{ position: 'absolute', inset: 0, overflow: 'visible', pointerEvents: 'none' }}
               width={w}
@@ -48,21 +45,20 @@ const RoomNode = ({ data, selected, width, height }) => {
             {isPolygon ? (
                 <polygon
                     points={pointsString}
-                    fill={data?.color || '#009688'}
-                    fillOpacity={selected ? 0.4 : 0.2}
-                    stroke={selected ? '#009688' : 'transparent'}
+                    fill={data?.color || '#B3E5FC'} // Bleu très pâle par défaut
+                    fillOpacity={selected ? 0.6 : 0.3} // Fond léger
+                    stroke={selected ? '#0288D1' : 'transparent'}
                     strokeWidth="2"
                     strokeDasharray="4 4"
-                    style={{ pointerEvents: 'all', cursor: 'pointer' }} // Rendre le polygone cliquable
+                    style={{ pointerEvents: 'all', cursor: 'pointer' }}
                 />
             ) : (
-                /* Fallback au cas où ce serait une pièce dessinée manuellement (rectangle classique) */
                 <rect
                     width={w}
                     height={h}
-                    fill={data?.color || '#009688'}
-                    fillOpacity={selected ? 0.4 : 0.2}
-                    stroke={selected ? '#009688' : 'transparent'}
+                    fill={data?.color || '#B3E5FC'}
+                    fillOpacity={selected ? 0.6 : 0.3}
+                    stroke={selected ? '#0288D1' : 'transparent'}
                     strokeWidth="2"
                     strokeDasharray="4 4"
                     rx="4"
@@ -71,15 +67,15 @@ const RoomNode = ({ data, selected, width, height }) => {
             )}
           </svg>
 
-          {/* Informations de la pièce (Nom + Surface en m²) centrées */}
+          {/* Affichage Surface et Label */}
           <div style={{
             position: 'absolute', inset: 0,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#2D3748',
-            pointerEvents: 'none', // Pour ne pas gêner les clics sur les murs en dessous
+            color: '#01579B',
+            pointerEvents: 'none',
           }}>
           <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
             {data?.label || 'Pièce'}

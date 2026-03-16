@@ -41,6 +41,40 @@ const WallNode = ({ id, data, selected }) => {
         left: `-${thickness / 2}px`,
         pointerEvents: isPreview ? 'none' : 'auto' 
       }}>
+        {/* Hitbox cliquable transparente pour sélectionner le mur */}
+        <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            cursor: 'pointer'
+        }}></div>
+
+        {/* Le rendu visuel du mur en SVG avec strokeLinecap="round" pour éviter les piques aux angles */}
+        <svg 
+            style={{ 
+                position: 'absolute', 
+                top: 0, 
+                left: 0, 
+                overflow: 'visible',
+                pointerEvents: 'none' 
+            }} 
+            width={length + thickness} 
+            height={thickness}
+        >
+            <line 
+                x1={thickness / 2} 
+                y1={thickness / 2} 
+                x2={length + thickness / 2} 
+                y2={thickness / 2} 
+                stroke={isPreview ? 'rgba(49, 130, 206, 0.4)' : '#334155'}
+                strokeWidth={thickness}
+                strokeLinecap="round" // ARRONDI POUR ÉVITER LES PIQUES (Spike fix)
+                strokeDasharray={isPreview ? "5,5" : "none"}
+            />
+        </svg>
+
         {selected && !isPreview && (
             <>
               <div
@@ -59,8 +93,6 @@ const WallNode = ({ id, data, selected }) => {
         <div style={{
           width: '100%',
           height: '100%',
-          background: isPreview ? 'rgba(49, 130, 206, 0.4)' : '#334155',
-          border: isPreview ? '2px dashed #3182CE' : 'none',
           boxSizing: 'border-box',
           pointerEvents: isPreview ? 'none' : 'auto'
         }}>

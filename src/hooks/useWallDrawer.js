@@ -3,12 +3,16 @@ import { useReactFlow, useStoreApi } from 'reactflow';
 
 const getId = () => `wall_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+export const SNAP_GRID = 15; // Exported for useAngleNodes
+
 export const getWallEndpoints = (wallNode) => {
   const pos = wallNode.position;
   const length = wallNode.data?.length || wallNode.style?.width || 0;
   const height = wallNode.style?.height || wallNode.data?.thickness || 15;
   const rotation = (wallNode.data?.rotation || 0) * Math.PI / 180;
 
+  // Assuming pos.x, pos.y is the top-left of the wall's bounding box
+  // The centerline starts at (pos.x, pos.y + height / 2)
   const x1 = pos.x;
   const y1 = pos.y + height / 2;
   const x2 = pos.x + length * Math.cos(rotation);
@@ -17,10 +21,12 @@ export const getWallEndpoints = (wallNode) => {
   return [{ x: x1, y: y1 }, { x: x2, y: y2 }];
 };
 
+// Vérifie si deux points sont connectés (proches)
 const arePointsConnected = (p1, p2, tolerance = 5) => {
     return Math.hypot(p1.x - p2.x, p1.y - p2.y) <= tolerance;
 };
 
+// Fonction pour récupérer TOUS les murs connectés à un point donné
 const getConnectedWalls = (point, nodes, excludeWallId) => {
     return nodes.filter(node => {
         if (node.type !== 'wall' || node.id === excludeWallId || node.id === 'wall_preview') return false;
@@ -142,7 +148,6 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
   const [wallStartPoint, setWallStartPoint] = useState(null);
   const [currentPath, setCurrentPath] = useState([]);
   
-  // États de redimensionnement manuel
   const [resizingWallId, setResizingWallId] = useState(null);
   const [resizeHandle, setResizeHandle] = useState(null); // 'start' ou 'end'
   const [fixedPoint, setFixedPoint] = useState(null);
@@ -153,14 +158,15 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
   const { screenToFlowPosition, setCenter, getZoom } = useReactFlow();
   const store = useStoreApi(); 
 
-  const SNAP_GRID = 15;
   const SNAP_RADIUS = 20;
 
   const cancelDrawing = useCallback(() => {
     setIsDrawingWall(false);
     setWallStartPoint(null);
     setCurrentPath([]);
-    setNodes((nds) => nds.filter((n) => n.id !== 'wall_preview'));
+    setNodes((nds) => {
+        return nds.filter((n) => n.id !== 'wall_preview');
+    });
     setResizingWallId(null);
     setLinkedWallIds([]);
     setLinkedWallsAnchors({});
@@ -175,10 +181,6 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isDrawingWall, resizingWallId, cancelDrawing]);
 
-  useEffect(() => {
-    if (!isDrawingWall && !resizingWallId) cancelDrawing();
-  }, [isDrawingWall, resizingWallId, cancelDrawing]);
-
   // ON MOUSE DOWN POUR LE REDIMENSIONNEMENT (Event Custom venant de WallNode)
   useEffect(() => {
     const handleStartResize = (e) => {
@@ -187,7 +189,7 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
       if (node) {
         if (takeSnapshot) takeSnapshot();
         const [A, B] = getWallEndpoints(node);
-        
+
         let movingPoint;
         if (handleType === 'start') {
           setResizeHandle('start');
@@ -198,14 +200,14 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
           setFixedPoint(A);
           movingPoint = B;
         }
-        
+
         setResizingWallId(nodeId);
 
         // Au moment du clic, on fige la liste des murs qui étaient attachés à ce point ET leur point fixe (l'autre bout)
         if (isWallLinkingEnabled) {
             const connected = getConnectedWalls(movingPoint, nodes, nodeId);
             const anchors = {};
-            
+
             connected.forEach(connectedNode => {
                 const [cA, cB] = getWallEndpoints(connectedNode);
                 if (arePointsConnected(cA, movingPoint)) {
@@ -214,7 +216,7 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
                     anchors[connectedNode.id] = cA;
                 }
             });
-            
+
             setLinkedWallIds(connected.map(n => n.id));
             setLinkedWallsAnchors(anchors);
         } else {
@@ -270,7 +272,6 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
 
 
   const onPaneClick = useCallback((event) => {
-      // 1. On est en mode dessin, MAIS l'utilisateur peut cliquer sur ReactFlow (pas sur un bouton).
       if (resizingWallId) return;
 
       if (!isDrawingWall) return;
@@ -304,7 +305,7 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
 
           const startOfPath = currentPath[0];
           const distToStart = Math.hypot(endPoint.x - startOfPath.x, endPoint.y - startOfPath.y);
-          
+
           let isClosingPath = currentPath.length >= 2 && distToStart < SNAP_RADIUS;
           let isClosingExistingWall = false;
           let existingWallPoint = null;
@@ -343,7 +344,7 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
           const newWall = {
               id: getId(),
               type: 'wall',
-              position: { x: wallStartPoint.x, y: wallStartPoint.y - 7.5 }, 
+              position: { x: wallStartPoint.x, y: wallStartPoint.y - 7.5 },
               data: { label: '', rotation: angle, length: Math.round(distance), thickness: 15 },
               style: { width: distance, height: 15 },
           };
@@ -353,26 +354,63 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
           if (isClosing) {
               currentNodes = splitWallsIfNeeded(wallStartPoint, currentNodes, getId);
               currentNodes = splitWallsIfNeeded(finalEndPoint, currentNodes, getId);
-              currentNodes = cleanupWalls(currentNodes); 
+              currentNodes = cleanupWalls(currentNodes);
+              currentNodes = currentNodes.filter(n => n.id !== 'wall_preview').concat(newWall);
 
-              setNodes(currentNodes.filter(n => n.id !== 'wall_preview').concat(newWall));
+              setNodes(currentNodes);
               setIsDrawingWall(false);
               setWallStartPoint(null);
               setCurrentPath([]);
           } else {
               currentNodes = splitWallsIfNeeded(wallStartPoint, currentNodes, getId);
               currentNodes = splitWallsIfNeeded(finalEndPoint, currentNodes, getId);
-              currentNodes = cleanupWalls(currentNodes); 
+              currentNodes = cleanupWalls(currentNodes);
+              currentNodes = currentNodes.filter(n => n.id !== 'wall_preview').concat(newWall);
 
-              setNodes(currentNodes.filter(n => n.id !== 'wall_preview').concat(newWall));
+              setNodes(currentNodes);
               setWallStartPoint(finalEndPoint);
               setCurrentPath(prev => [...prev, finalEndPoint]);
           }
       }
   }, [isDrawingWall, getPoint, wallStartPoint, currentPath, nodes, setErrorMessage, texts, takeSnapshot, setNodes, setIsDrawingWall, screenToFlowPosition, resizingWallId]);
 
-  const onPaneMouseMove = useCallback((event) => {
-    
+  // ON RAJOUTE LE PREVIEW DANS LE HOOK !
+  const handlePaneMouseMoveNativeLogic = useCallback((event) => {
+    if (!isDrawingWall || !wallStartPoint || resizingWallId) return;
+
+    const rawPos = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+    let currentPoint = getPoint(rawPos);
+
+    setNodes(nds => {
+      const dx = currentPoint.x - wallStartPoint.x;
+      const dy = currentPoint.y - wallStartPoint.y;
+      const distance = Math.hypot(dx, dy);
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      const thickness = 15;
+
+      const existingWall = nds.find(n => n.id === 'wall_preview');
+
+      if (existingWall) {
+        return nds.map(n => n.id === 'wall_preview' ? {
+          ...n,
+          data: { ...n.data, rotation: angle, length: Math.round(distance), thickness: existingWall.data?.thickness || thickness },
+          position: { x: wallStartPoint.x, y: wallStartPoint.y - (existingWall.data?.thickness || thickness) / 2 },
+          style: { ...n.style, width: distance }
+        } : n);
+      } else {
+        return [...nds, {
+          id: 'wall_preview',
+          type: 'wall',
+          position: { x: wallStartPoint.x, y: wallStartPoint.y - (thickness / 2) },
+          data: { label: '', rotation: angle, length: Math.round(distance), thickness },
+          style: { width: distance, height: thickness, backgroundColor: 'transparent' },
+        }];
+      }
+    });
+  }, [isDrawingWall, wallStartPoint, screenToFlowPosition, getPoint, setNodes, resizingWallId]);
+
+  const handlePaneMouseMoveLogic = useCallback((event) => {
+
     // --- Auto-pan robuste via le store ---
     if (reactFlowWrapper?.current && (isDrawingWall || resizingWallId)) {
         const bounds = reactFlowWrapper.current.getBoundingClientRect();
@@ -408,19 +446,18 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
     // 1. Redimensionnement manuel ET lié
     if (resizingWallId && fixedPoint) {
       let currentPoint = getPoint(rawPos, resizingWallId);
-      
+
       setNodes(nds => {
-          return nds.map(node => {
-              // 1. Mettre à jour le mur qu'on est en train de tirer
+          let updatedNodes = nds.map(node => {
               if (node.id === resizingWallId) {
                   let p1 = resizeHandle === 'start' ? currentPoint : fixedPoint;
                   let p2 = resizeHandle === 'end' ? currentPoint : fixedPoint;
-                  
+
                   const dx = p2.x - p1.x;
                   const dy = p2.y - p1.y;
                   const distance = Math.hypot(dx, dy);
                   const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-                  
+
                   return {
                       ...node,
                       position: { x: p1.x, y: p1.y - (node.style?.height || node.data?.thickness || 15) / 2 },
@@ -429,15 +466,13 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
                   };
               }
 
-              // 2. Mettre à jour les murs liés EN TEMPS RÉEL (Contrainte stricte)
               if (isWallLinkingEnabled && linkedWallIds.includes(node.id)) {
-                  // L'ancre a été fixée au moment du clic !
                   let anchorPoint = linkedWallsAnchors[node.id];
-                  
+
                   if (anchorPoint) {
                       const distance = Math.hypot(currentPoint.x - anchorPoint.x, currentPoint.y - anchorPoint.y);
                       const angle = Math.atan2(currentPoint.y - anchorPoint.y, currentPoint.x - anchorPoint.x) * (180 / Math.PI);
-                      
+
                       return {
                           ...node,
                           position: { x: anchorPoint.x, y: anchorPoint.y - (node.style?.height || node.data?.thickness || 15) / 2 },
@@ -449,42 +484,12 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
 
               return node;
           });
+
+          return updatedNodes;
       });
-      return;
     }
 
-    // 2. Prévisualisation création
-    if (!isDrawingWall || !wallStartPoint) return;
-
-    let currentPoint = getPoint(rawPos);
-
-    setNodes(nds => {
-      const dx = currentPoint.x - wallStartPoint.x;
-      const dy = currentPoint.y - wallStartPoint.y;
-      const distance = Math.hypot(dx, dy);
-      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-      const thickness = 15;
-
-      const existingWall = nds.find(n => n.id === 'wall_preview');
-
-      if (existingWall) {
-        return nds.map(n => n.id === 'wall_preview' ? {
-          ...n,
-          data: { ...n.data, rotation: angle, length: Math.round(distance), thickness: existingWall.data?.thickness || thickness },
-          position: { x: wallStartPoint.x, y: wallStartPoint.y - (existingWall.data?.thickness || thickness) / 2 },
-          style: { ...n.style, width: distance }
-        } : n);
-      } else {
-        return [...nds, {
-          id: 'wall_preview',
-          type: 'wall',
-          position: { x: wallStartPoint.x, y: wallStartPoint.y - (thickness / 2) },
-          data: { label: '', rotation: angle, length: Math.round(distance), thickness },
-          style: { width: distance, height: thickness, backgroundColor: 'transparent' },
-        }];
-      }
-    });
-  }, [isDrawingWall, screenToFlowPosition, getPoint, setNodes, wallStartPoint, resizingWallId, fixedPoint, resizeHandle, store, setCenter, getZoom, reactFlowWrapper, isWallLinkingEnabled, linkedWallIds, linkedWallsAnchors]);
+  }, [isDrawingWall, getPoint, setNodes, resizingWallId, fixedPoint, resizeHandle, store, setCenter, getZoom, reactFlowWrapper, isWallLinkingEnabled, linkedWallIds, linkedWallsAnchors, screenToFlowPosition]);
 
   const onPaneContextMenu = useCallback((event) => {
     if (isDrawingWall) {
@@ -512,8 +517,9 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
             finalNodes = splitWallsIfNeeded(B, finalNodes, getId);
 
             finalNodes = cleanupWalls(finalNodes);
-
-            setNodes([...finalNodes, nodeToUpdate]);
+            finalNodes.push(nodeToUpdate);
+            
+            setNodes(finalNodes);
         }
 
         setResizingWallId(null);
@@ -551,7 +557,10 @@ export const useWallDrawer = ({ isDrawingWall, setIsDrawingWall, nodes, setNodes
 
   return { 
     onPaneClick,
-    onPaneMouseMove,
+    onPaneMouseMove: (e) => {
+        handlePaneMouseMoveNativeLogic(e);
+        handlePaneMouseMoveLogic(e);
+    },
     onPaneContextMenu,
     onNodeClick,
     onNodeDragStart

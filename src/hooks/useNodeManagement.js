@@ -8,44 +8,59 @@ export const useNodeManagement = ({ nodes, levels, setNodes, setEdges, takeSnaps
 
   // --- LOGIQUE D'AIMANTATION (SMART SNAPPING) ---
   const getSnappedPosition = useCallback((pos, type, currentRotation) => {
-    const SNAP_THRESHOLD = 30; // Distance d'attraction
+    const SNAP_THRESHOLD = 30; 
     let snappedPos = { ...pos };
     let rotation = currentRotation || 0;
     let isSnapped = false;
 
-    // On ne snappe que certains composants sur les murs
+    // Seuls les éléments liés aux murs s'aimantent
     const snappableTypes = ['socket', 'socket_double', 'socket_triple', 'switch', 'wall_light', 'door', 'window', 'rj45', 'thermostat', 'camera'];
-    if (!snappableTypes.includes(type)) return { pos, rotation, isSnapped };
+    if (!snappableTypes.includes(type)) return { pos, rotation, isSnapped, wallThickness: null };
+
+    let bestWallThickness = null;
 
     nodes.forEach(wall => {
       if (wall.type !== 'wall') return;
 
       const wX = wall.position.x;
       const wY = wall.position.y;
-      const wW = wall.style.width || 15;
-      const wH = wall.style.height || 15;
-      const isHorizontal = wW > wH;
-
-      if (isHorizontal) {
-        // Distance au centre vertical du mur
-        const distY = Math.abs(pos.y - (wY + wH / 2));
-        if (distY < SNAP_THRESHOLD && pos.x >= wX && pos.x <= wX + wW) {
-          snappedPos.y = wY + wH / 2 - 20; // On centre le composant sur le mur
-          rotation = 0;
+      
+      // On récupère la longueur et l'épaisseur, en tenant compte de la rotation
+      const wLength = wall.data?.length || wall.style?.width || 0;
+      const wThickness = wall.data?.thickness || wall.style?.height || 15;
+      const wRot = wall.data?.rotation || 0;
+      
+      // Pour l'aimantation, on doit calculer la position du point sur le segment du mur
+      // 1. Conversion de la position de la souris dans le repère local du mur
+      const dx = pos.x - wX;
+      const dy = pos.y - wY;
+      
+      const rad = wRot * Math.PI / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      
+      const localX = dx * cos + dy * sin;
+      const localY = -dx * sin + dy * cos;
+      
+      // Si on est à peu près sur la longueur du mur, et proche de son centre (épaisseur)
+      if (localX >= 0 && localX <= wLength && Math.abs(localY) < SNAP_THRESHOLD) {
+          
+          // On "cloue" l'élément sur l'axe central du mur
+          // On ramène localY à 0, et on re-projette dans l'espace global
+          const newDx = localX * cos;
+          const newDy = localX * sin;
+          
+          snappedPos.x = wX + newDx;
+          snappedPos.y = wY + newDy;
+          
+          // La rotation s'adapte au mur
+          rotation = wRot;
           isSnapped = true;
-        }
-      } else {
-        // Distance au centre horizontal du mur
-        const distX = Math.abs(pos.x - (wX + wW / 2));
-        if (distX < SNAP_THRESHOLD && pos.y >= wY && pos.y <= wY + wH) {
-          snappedPos.x = wX + wW / 2 - 20;
-          rotation = 90;
-          isSnapped = true;
-        }
+          bestWallThickness = wThickness;
       }
     });
 
-    return { pos: snappedPos, rotation, isSnapped };
+    return { pos: snappedPos, rotation, isSnapped, wallThickness: bestWallThickness };
   }, [nodes]);
 
   const onNodesChange = useCallback((changes) => {
@@ -63,21 +78,53 @@ export const useNodeManagement = ({ nodes, levels, setNodes, setEdges, takeSnaps
         const intermediateLevels = cs.levels.map(l => l.id === cs.activeLevelId ? { ...l, nodes: nextActiveNodes } : l);
 
         if (affectedLetters.size > 0) {
-          // Logique de ré-indexation simplifiée pour l'exemple
           return { ...cs, levels: intermediateLevels };
         }
         return { ...cs, levels: intermediateLevels };
       });
     } else {
-      setNodes((nds) => applyNodeChanges(changes, nds));
+      setNodes((nds) => {
+          // Pendant le drag, on peut forcer l'aimantation en temps réel !
+          const positionChanges = changes.filter(c => c.type === 'position' && c.position);
+          
+          if (positionChanges.length > 0) {
+              return nds.map(node => {
+                  const change = positionChanges.find(c => c.id === node.id);
+                  if (change && change.position) { // FIX: S'assurer que position existe bien
+                      // Si c'est un noeud "snappable", on calcule le snap
+                      const { pos, rotation, isSnapped, wallThickness } = getSnappedPosition(change.position, node.type, node.data?.rotation);
+                      
+                      if (isSnapped) {
+                          return { 
+                              ...node, 
+                              position: pos, 
+                              data: { ...node.data, rotation },
+                              // Si c'est une porte ou une fenêtre, on ajuste son épaisseur (hauteur de style) sur le mur
+                              style: (node.type === 'door' || node.type === 'window') ? { ...node.style, height: wallThickness } : node.style
+                          };
+                      }
+                  }
+                  // S'il y a un changement pour ce noeud, on l'applique (en vérifiant bien qu'on passe un tableau valide)
+                  return change ? applyNodeChanges([change], [node])[0] : node;
+              });
+          }
+          return applyNodeChanges(changes, nds);
+      });
     }
-  }, [takeSnapshot, setNodes, setState]);
+  }, [takeSnapshot, setNodes, setState, getSnappedPosition]);
 
   const onNodeDragStop = useCallback((event, node) => {
-    const { pos, rotation, isSnapped } = getSnappedPosition(node.position, node.type, node.data?.rotation);
+    if(!node || !node.position) return; // FIX: S'assurer que le node a une position
+    // Le snap est déjà géré en temps réel par onNodesChange, mais on double-vérifie ici à la fin
+    const { pos, rotation, isSnapped, wallThickness } = getSnappedPosition(node.position, node.type, node.data?.rotation);
     if (isSnapped) {
       takeSnapshot();
-      setNodes(nds => nds.map(n => n.id === node.id ? { ...n, position: pos, data: { ...n.data, rotation } } : n));
+      setNodes(nds => nds.map(n => n.id === node.id ? { 
+          ...n, 
+          position: pos, 
+          data: { ...n.data, rotation },
+          style: (n.type === 'door' || n.type === 'window') ? { ...n.style, height: wallThickness } : n.style
+      } : n));
     }
   }, [getSnappedPosition, setNodes, takeSnapshot]);
 
@@ -90,7 +137,7 @@ export const useNodeManagement = ({ nodes, levels, setNodes, setEdges, takeSnaps
     const rawPos = screenToFlowPosition({ x: event.clientX, y: event.clientY });
     
     // Application de l'aimantation au drop
-    const { pos, rotation } = getSnappedPosition(rawPos, type, 0);
+    const { pos, rotation, wallThickness } = getSnappedPosition(rawPos, type, 0);
 
     const baseLetter = activeCircuit || 'A';
     let maxNum = 0;
@@ -110,6 +157,7 @@ export const useNodeManagement = ({ nodes, levels, setNodes, setEdges, takeSnaps
         circuit: `${baseLetter}${maxNum + 1}`,
         rotation: rotation
       },
+      style: (type === 'door' || type === 'window') ? { width: 80, height: wallThickness || 15 } : {}
     };
 
     setNodes((nds) => nds.concat(newNode));

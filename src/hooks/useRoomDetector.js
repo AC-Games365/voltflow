@@ -2,24 +2,21 @@ import { useMemo } from 'react';
 
 const getRoomId = (points) => `room_${points.map(p => `${Math.round(p.x)}_${Math.round(p.y)}`).join('-')}`;
 
-// Fonction utilitaire pour récupérer les vraies coordonnées
 const getWallEndpoints = (wall) => {
-  const w = wall.style?.width || 0;
-  const h = wall.style?.height || 15;
+  const w = wall.data?.length || wall.style?.width || 0;
+  // On ne prend plus l'épaisseur en compte pour les points logiques, le graphe est une ligne pure
   const rot = (wall.data?.rotation || 0) * Math.PI / 180;
 
   const x1 = wall.position.x;
-  const y1 = wall.position.y + h / 2;
+  const y1 = wall.position.y;
   const x2 = x1 + w * Math.cos(rot);
   const y2 = y1 + w * Math.sin(rot);
 
   return [{ x: x1, y: y1 }, { x: x2, y: y2 }];
 };
 
-// Tolérance de 10px pour que les intersections soient bien fusionnées, même si légèrement décalées
-const roundPoint = (p) => `${Math.round(p.x / 10) * 10},${Math.round(p.y / 10) * 10}`;
+const roundPoint = (p) => `${Math.round(p.x / 5) * 5},${Math.round(p.y / 5) * 5}`;
 
-// Formule de l'aire pour trier les cycles
 const getPolygonArea = (polygon) => {
   let sum = 0;
   for (let i = 0; i < polygon.length; i++) {
@@ -30,7 +27,6 @@ const getPolygonArea = (polygon) => {
   return Math.abs(sum) / 2;
 };
 
-// Algorithme du point dans un polygone (Ray-casting)
 const pointInPolygon = (point, vs) => {
     let x = point.x, y = point.y;
     let inside = false;
@@ -52,7 +48,6 @@ export const useRoomDetector = (wallNodes) => {
     const points = new Map();
     const adj = new Map();
 
-    // 1. Construire le graphe de connexion
     validWalls.forEach(wall => {
       const [p1, p2] = getWallEndpoints(wall);
       const startKey = roundPoint(p1);
@@ -72,20 +67,17 @@ export const useRoomDetector = (wallNodes) => {
 
     const cycles = [];
 
-    // 2. Recherche de cycles (DFS)
     function findCycles(path) {
-      if (path.length > 20) return; // Sécurité
+      if (path.length > 20) return;
 
       const startNode = path[0];
       const nextNode = path[path.length - 1];
       const neighbors = Array.from(adj.get(nextNode) || []);
 
       for (const neighbor of neighbors) {
-        // Ne pas revenir sur ses pas immédiatement
         if (path.length > 1 && neighbor === path[path.length - 2]) continue;
 
         if (path.length > 2 && neighbor === startNode) {
-          // On a bouclé ! On normalise le cycle pour éviter de l'ajouter 50 fois
           let minIdx = 0;
           for (let i = 1; i < path.length; i++) {
               if (path[i] < path[minIdx]) minIdx = i;
@@ -116,7 +108,6 @@ export const useRoomDetector = (wallNodes) => {
       findCycles([startNode]);
     }
 
-    // 3. Filtrer les cycles pour ne garder que les "faces" intérieures
     const cycleData = cycles.map(cycle => {
         const cyclePoints = cycle.path.map(key => points.get(key));
         const area = getPolygonArea(cyclePoints);
@@ -129,8 +120,6 @@ export const useRoomDetector = (wallNodes) => {
         let hasInternalNode = false;
         const currentPathSet = new Set(current.path);
         
-        // Si un noeud du graphe est strictement à l'intérieur de ce cycle, 
-        // alors ce cycle englobe d'autres pièces (c'est le périmètre de la maison), on l'ignore.
         for (const [nodeKey, nodePoint] of points.entries()) {
             if (!currentPathSet.has(nodeKey)) {
                 if (pointInPolygon(nodePoint, current.cyclePoints)) {
@@ -140,18 +129,13 @@ export const useRoomDetector = (wallNodes) => {
             }
         }
 
-        // Il faut aussi filtrer les cycles qui partagent des cordes (des murs qui traversent la pièce)
-        // Mais l'heuristique des noeuds internes suffit dans 95% des cas de dessin de murs.
         if (!hasInternalNode) {
             validCycles.push(current);
         }
     }
 
-    // 4. Convertir en noeuds de pièces (RoomNodes)
     const roomNodes = validCycles.map(cycle => {
       const cyclePoints = cycle.cyclePoints;
-
-      // Plus besoin de trier (sortPoints), le DFS nous a donné l'ordre naturel du tracé !
       
       const minX = Math.min(...cyclePoints.map(p => p.x));
       const minY = Math.min(...cyclePoints.map(p => p.y));
@@ -164,9 +148,10 @@ export const useRoomDetector = (wallNodes) => {
       return {
         id: getRoomId(cyclePoints),
         type: 'room',
+        // La position de la pièce est le minX minY du polygone
         position: { x: minX, y: minY },
-        data: { label: 'Pièce', color: '#009688', polygon: cyclePoints }, 
-        style: { width, height, zIndex: -1 },
+        data: { label: 'Pièce', color: '#B3E5FC', polygon: cyclePoints }, 
+        style: { width, height, zIndex: -10 }, // zIndex très bas pour être sous les murs
         draggable: false,
         selectable: true,
       };

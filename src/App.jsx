@@ -19,6 +19,7 @@ import { useFileHandlers } from './hooks/useFileHandlers.js';
 import { useWallDrawer } from './hooks/useWallDrawer.js';
 import { useNodeManagement } from './hooks/useNodeManagement.js';
 import { useRoomDetector } from './hooks/useRoomDetector.js';
+import { useAngleNodes } from './hooks/useAngleNodes.js';
 import { getLayoutedElements } from './layout.js';
 
 // Pages
@@ -40,6 +41,7 @@ import WallNode from './WallNode.jsx';
 import RoomNode from './RoomNode.jsx';
 import DoorNode from './DoorNode.jsx';
 import WindowNode from './WindowNode.jsx';
+import AngleNode from './AngleNode.jsx';
 import PanelNode from './PanelNode.jsx';
 import BreakerNode from './BreakerNode.jsx';
 import SwitchNode from './SwitchNode.jsx';
@@ -65,6 +67,7 @@ const initialNodeTypes = {
   room: RoomNode,
   door: DoorNode,
   window: WindowNode,
+  angle: AngleNode,
   panel: PanelNode,
   breaker: BreakerNode,
   switch: SwitchNode,
@@ -90,7 +93,7 @@ const initialPlan = {
     projectName: '', clientName: '', clientAddress: '', installerName: '',
     date: new Date().toISOString().split('T')[0],
     showCartouche: false, showDimensions: true, showLegend: true, canvasBgColor: '#f0f0f0',
-    standard: 'be', showWallDimensions: true, isWallLinkingEnabled: true
+    standard: 'be', showWallDimensions: true, isWallLinkingEnabled: true, showAngles: false, showAllAngles: false
   }
 };
 
@@ -112,6 +115,12 @@ const getSavedPlan = (currentUser) => {
       }
       if(projectData.isWallLinkingEnabled === undefined) {
           projectData.isWallLinkingEnabled = true;
+      }
+      if(projectData.showAngles === undefined) {
+          projectData.showAngles = false;
+      }
+      if(projectData.showAllAngles === undefined) {
+          projectData.showAllAngles = false;
       }
       return { ...initialPlan, ...parsed, projectData };
     } catch (e) { console.error("Erreur chargement", e); }
@@ -183,6 +192,9 @@ function Editor() {
   const edges = activeLevel.edges;
 
   const detectedRooms = useRoomDetector(nodes);
+  
+  // Utilisation de notre nouveau hook
+  const angleNodes = useAngleNodes(nodes, projectData.showAngles, projectData.showAllAngles);
 
   const mappedNodes = useMemo(() => nodes.map(n => {
     if(n.type === 'wall' || n.id === 'wall_preview') {
@@ -191,7 +203,8 @@ function Editor() {
     return n;
   }), [nodes, projectData.showWallDimensions]);
 
-  const planNodes = useMemo(() => [...detectedRooms, ...mappedNodes], [detectedRooms, mappedNodes]);
+  // Ajout des angleNodes au plan
+  const planNodes = useMemo(() => [...detectedRooms, ...mappedNodes, ...angleNodes], [detectedRooms, mappedNodes, angleNodes]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -200,7 +213,8 @@ function Editor() {
       }
     }, 100);
     return () => clearTimeout(timer);
-  }, [viewMode, refreshTrigger, fitView]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, refreshTrigger]); 
 
   const setNodes = useCallback((newNodes) => {
     setState(cs => ({
@@ -288,12 +302,11 @@ function Editor() {
     const initialEdges = [];
     const circuits = {};
 
-    const _ = refreshTrigger;
-
     levels.forEach(level => {
       level.nodes.forEach(n => {
         const circuitName = n.data?.circuit;
-        if (circuitName !== null && circuitName !== undefined && String(circuitName).trim() !== '') {
+        // Seulement les éléments qui ont un circuit et qui ne sont pas des murs/zones/textes
+        if (circuitName !== null && circuitName !== undefined && String(circuitName).trim() !== '' && !['wall', 'room', 'text', 'angle'].includes(n.type)) {
           const c = String(circuitName).trim().toUpperCase();
           if (!circuits[c]) circuits[c] = { components: [], breaker: null };
           if (n.type === 'breaker' || n.type === 'rcd') circuits[c].breaker = n;
@@ -364,6 +377,7 @@ function Editor() {
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(initialNodes, initialEdges);
 
     return { uNodes: layoutedNodes, uEdges: layoutedEdges };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, levels, texts, refreshTrigger]);
 
   const { onExportImage, onSave, onClear, onExportJSON, onImportJSON, exportToCSV, onExportPDF, isGeneratingPDF, handleImageUpload } = useFileHandlers({ nodes: levels.flatMap(l => l.nodes), edges: levels.flatMap(l => l.edges), levels, activeLevelId, projectData, setNodes, setEdges, setProjectData, setActiveLevelId, takeSnapshot, reactFlowWrapper, texts, lang });
@@ -505,6 +519,7 @@ function Editor() {
                     onDragOver={(e) => e.preventDefault()}
                     nodeTypes={nodeTypes}
 
+                    // On passe tous nos events au canevas
                     onPaneClick={onPaneClick}
                     onPaneMouseMove={onPaneMouseMove}
                     onPaneContextMenu={onPaneContextMenu}
@@ -555,7 +570,7 @@ function Editor() {
                                 <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}><input type="checkbox" id="hasArrow" checked={!!selectedEdge.markerEnd} onFocus={takeSnapshot} onChange={(e) => updateEdgeArrow(e.target.checked)} /><label htmlFor="hasArrow" style={{ fontSize: '12px', opacity: 0.7 }}>{texts.cable_arrow}</label></div>
                               </>
                           )}
-                          {selectedNode && selectedNode.type !== 'wall' && selectedNode.type !== 'group' && (<div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.name_label}</label><input type="text" value={selectedNode.data?.label || ''} onFocus={takeSnapshot} onChange={(e) => updateNodeData('label', e.target.value)} style={{ width: '100%', padding: '5px' }}/></div>)}
+                          {selectedNode && !['wall', 'group', 'angle'].includes(selectedNode.type) && (<div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.name_label}</label><input type="text" value={selectedNode.data?.label || ''} onFocus={takeSnapshot} onChange={(e) => updateNodeData('label', e.target.value)} style={{ width: '100%', padding: '5px' }}/></div>)}
                           {selectedNode && ['light', 'spotlight', 'wall_light', 'socket', 'socket_double', 'socket_triple', 'switch', 'switch_two_way', 'push_button', 'breaker', 'rj45', 'thermostat', 'camera'].includes(selectedNode.type) && (
                               <div style={{ marginBottom: '10px', padding: '10px', background: 'var(--item-bg)', border: '1px solid var(--item-border)', borderRadius: '4px' }}>
                                 <label style={{ display: 'block', fontSize: '12px', color: '#007bff', fontWeight: 'bold', marginBottom: '5px' }}>{texts.circuit_name}</label>
@@ -567,8 +582,30 @@ function Editor() {
                                 </div>
                               </div>
                           )}
-                          {selectedNode && selectedNode.type === 'breaker' && (<div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.amperage}</label><input type="text" value={selectedNode.data?.amperage || ''} onFocus={takeSnapshot} onChange={(e) => updateNodeData('amperage', e.target.value)} style={{ width: '100%', padding: '5px' }}/></div>)}
-                          {selectedNode && ['light', 'spotlight', 'wall_light', 'socket', 'socket_double', 'socket_triple', 'door', 'window', 'switch', 'switch_two_way', 'push_button', 'rj45', 'thermostat', 'camera'].includes(selectedNode.type) && (<div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.rotation}</label><input type="number" step="90" value={selectedNode.data?.rotation || 0} onFocus={takeSnapshot} onChange={(e) => updateNodeData('rotation', parseInt(e.target.value, 10) || 0)} style={{ width: '100%', padding: '5px' }}/></div>)}
+                          {selectedNode && ['breaker'].includes(selectedNode.type) && (<div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.amperage}</label><input type="text" value={selectedNode.data?.amperage || ''} onFocus={takeSnapshot} onChange={(e) => updateNodeData('amperage', e.target.value)} style={{ width: '100%', padding: '5px' }}/></div>)}
+                          
+                          {/* NOUVEAU: Propriétés étendues pour les portes et fenêtres */}
+                          {selectedNode && ['door', 'window'].includes(selectedNode.type) && (
+                            <>
+                              <div style={{ marginBottom: '10px' }}>
+                                <label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>Largeur (cm) :</label>
+                                <input type="number" value={selectedNode.style?.width || 80} onFocus={takeSnapshot} onChange={(e) => updateNodeStyle('width', parseInt(e.target.value, 10) || 80)} style={{ width: '100%', padding: '5px' }}/>
+                              </div>
+                              <div style={{ marginBottom: '10px' }}>
+                                <label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>Épaisseur mur (cm) :</label>
+                                <input type="number" value={selectedNode.style?.height || 15} onFocus={takeSnapshot} onChange={(e) => updateNodeStyle('height', parseInt(e.target.value, 10) || 15)} style={{ width: '100%', padding: '5px' }}/>
+                              </div>
+                            </>
+                          )}
+                          
+                          {selectedNode && ['door'].includes(selectedNode.type) && (
+                            <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <input type="checkbox" id="doorFlip" checked={selectedNode.data?.flip || false} onFocus={takeSnapshot} onChange={(e) => updateNodeData('flip', e.target.checked)} />
+                              <label htmlFor="doorFlip" style={{ fontSize: '12px', opacity: 0.7 }}>Inverser l'ouverture</label>
+                            </div>
+                          )}
+
+                          {selectedNode && ['light', 'spotlight', 'wall_light', 'socket', 'socket_double', 'socket_triple', 'door', 'window', 'switch', 'switch_two_way', 'push_button', 'rj45', 'thermostat', 'camera'].includes(selectedNode.type) && (<div style={{ marginBottom: '10px' }}><label style={{ display: 'block', fontSize: '12px', opacity: 0.7, marginBottom: '5px' }}>{texts.rotation}</label><input type="number" step="90" value={Math.round(selectedNode.data?.rotation || 0)} onFocus={takeSnapshot} onChange={(e) => updateNodeData('rotation', parseInt(e.target.value, 10) || 0)} style={{ width: '100%', padding: '5px' }}/></div>)}
                           
                           {selectedNode && selectedNode.type === 'wall' && (
                             <>
@@ -600,6 +637,18 @@ function Editor() {
                           <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                               <input type="checkbox" id="showWallDimensions" checked={projectData.showWallDimensions !== false} onFocus={takeSnapshot} onChange={(e) => setProjectData(pd => ({...pd, showWallDimensions: e.target.checked}))} />
                               <label htmlFor="showWallDimensions" style={{ fontSize: '12px', opacity: 0.7 }}>{texts.show_wall_dimensions || "Afficher les dimensions des murs"}</label>
+                          </div>
+                          
+                          {/* NOUVEAU: Option pour les angles */}
+                          <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <input type="checkbox" id="showAngles" checked={projectData.showAngles === true} onFocus={takeSnapshot} onChange={(e) => setProjectData(pd => ({...pd, showAngles: e.target.checked}))} />
+                              <label htmlFor="showAngles" style={{ fontSize: '12px', opacity: 0.7 }}>Afficher les angles (°)</label>
+                          </div>
+
+                          {/* NOUVEAU: Option pour forcer l'affichage de TOUS les angles */}
+                          <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px', opacity: projectData.showAngles ? 1 : 0.5 }}>
+                              <input type="checkbox" id="showAllAngles" checked={projectData.showAllAngles === true} disabled={!projectData.showAngles} onFocus={takeSnapshot} onChange={(e) => setProjectData(pd => ({...pd, showAllAngles: e.target.checked}))} />
+                              <label htmlFor="showAllAngles" style={{ fontSize: '12px' }}>Inclure les angles droits (90°)</label>
                           </div>
 
                           <div style={{ marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '5px' }}><input type="checkbox" id="showLegend" checked={!!projectData.showLegend} onFocus={takeSnapshot} onChange={(e) => setProjectData(pd => ({...pd, showLegend: e.target.checked}))} /><label htmlFor="showLegend" style={{ fontSize: '12px', opacity: 0.7 }}>{texts.show_legend}</label></div>

@@ -1,24 +1,54 @@
 import { memo } from 'react';
+import { NodeResizer } from 'reactflow';
 
-const WindowNode = ({ data, selected }) => {
-  const rotation = data?.rotation || 0;
+const WindowNode = ({ data, selected, width, height }) => {
+  const w = width || 80;
+  const h = height || 15;
+
   return (
-    <div style={{ 
-      width: '50px', height: '50px', 
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      transform: `rotate(${rotation}deg)`, 
-      transition: 'transform 0.2s ease',
-      outline: selected ? '2px dashed #007bff' : 'none',
-      position: 'relative'
+    <div style={{
+      width: `${w}px`,
+      height: `${h}px`,
+      position: 'relative',
+      boxSizing: 'border-box',
     }}>
-      <svg width="50" height="50" viewBox="0 0 100 100" style={{ overflow: 'visible' }}>
-         {/* Fond pour masquer le mur en dessous */}
-         <rect x="-5" y="42" width="110" height="16" fill="#f0f0f0" />
-         {/* Cadre de la fenêtre */}
-         <rect x="0" y="42" width="100" height="16" fill="none" stroke="#333" strokeWidth="3" />
-         {/* Ligne centrale de vitrage */}
-         <line x1="0" y1="50" x2="100" y2="50" stroke="#333" strokeWidth="2" />
-      </svg>
+      <NodeResizer 
+         color="#3182CE" 
+         isVisible={selected} 
+         minWidth={40} 
+         minHeight={5}
+         handleStyle={{ width: 8, height: 8 }}
+      />
+      
+      {/* Structure de la fenêtre (efface le mur et dessine le vitrage) */}
+      <div style={{
+          width: '100%',
+          height: '100%',
+          background: '#ffffff', // Fond blanc pour cacher le mur
+          borderTop: '2px solid #334155', // Lignes du mur extérieur
+          borderBottom: '2px solid #334155',
+          boxSizing: 'border-box',
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center'
+      }}>
+          {/* Ligne(s) centrale(s) pour représenter le vitrage */}
+          <div style={{
+              width: '100%',
+              height: '3px',
+              background: '#3182CE',
+              opacity: 0.7
+          }} />
+          <div style={{
+              width: '100%',
+              height: '3px',
+              background: '#3182CE',
+              opacity: 0.7,
+              marginTop: '1px'
+          }} />
+      </div>
     </div>
   );
 };
