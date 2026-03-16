@@ -1,69 +1,85 @@
 import { useMemo } from 'react';
 
-const getRoomId = (points) => `room_${points.map(p => `${p.x}-${p.y}`).join('_')}`;
+const getRoomId = (points) => `room_${points.map(p => `${Math.round(p.x)}_${Math.round(p.y)}`).join('-')}`;
+
+// Fonction utilitaire pour récupérer les vraies coordonnées
+const getWallEndpoints = (wall) => {
+  const w = wall.style?.width || 0;
+  const h = wall.style?.height || 15;
+  const rot = (wall.data?.rotation || 0) * Math.PI / 180;
+
+  const x1 = wall.position.x;
+  const y1 = wall.position.y + h / 2;
+  const x2 = x1 + w * Math.cos(rot);
+  const y2 = y1 + w * Math.sin(rot);
+
+  return [{ x: x1, y: y1 }, { x: x2, y: y2 }];
+};
+
+// Arrondi pour "fusionner" les points qui sont presque au même endroit (tolérance de 5px)
+const roundPoint = (p) => `${Math.round(p.x / 5) * 5},${Math.round(p.y / 5) * 5}`;
 
 export const useRoomDetector = (wallNodes) => {
   const detectedRooms = useMemo(() => {
-    if (wallNodes.length < 3) return [];
+    // On ne garde que les vrais murs terminés
+    const validWalls = wallNodes.filter(n => n.type === 'wall' && n.id !== 'wall_preview');
+    if (validWalls.length < 3) return [];
 
     const points = new Map();
     const adj = new Map();
 
-    // 1. Construire le graphe
-    wallNodes.forEach(wall => {
-      const w = wall.style.width;
-      const h = wall.style.height;
-      const p1 = { x: wall.position.x, y: wall.position.y };
-      const p2 = { x: wall.position.x + w, y: wall.position.y + h };
-
-      const startKey = `${p1.x},${p1.y}`;
-      const endKey = `${p2.x},${p2.y}`;
+    // 1. Construire le graphe de connexion avec les VRAIES coordonnées
+    validWalls.forEach(wall => {
+      const [p1, p2] = getWallEndpoints(wall);
+      const startKey = roundPoint(p1);
+      const endKey = roundPoint(p2);
 
       if (!points.has(startKey)) points.set(startKey, p1);
       if (!points.has(endKey)) points.set(endKey, p2);
 
-      if (!adj.has(startKey)) adj.set(startKey, []);
-      if (!adj.has(endKey)) adj.set(endKey, []);
-      adj.get(startKey).push(endKey);
-      adj.get(endKey).push(startKey);
+      if (!adj.has(startKey)) adj.set(startKey, new Set());
+      if (!adj.has(endKey)) adj.set(endKey, new Set());
+
+      if (startKey !== endKey) {
+        adj.get(startKey).add(endKey);
+        adj.get(endKey).add(startKey);
+      }
     });
 
     const cycles = [];
-    const visitedForCycle = new Set();
 
-    // 2. Recherche de cycles (DFS)
-    function findNewCycles(path) {
+    // 2. Recherche de cycles optimisée (DFS limité)
+    function findCycles(path) {
+      // Limite de sécurité pour éviter de figer le navigateur
+      if (path.length > 15) return;
+
       const startNode = path[0];
       const nextNode = path[path.length - 1];
+      const neighbors = Array.from(adj.get(nextNode) || []);
 
-      const neighbors = adj.get(nextNode) || [];
       for (const neighbor of neighbors) {
         if (path.length > 2 && neighbor === startNode) {
-          const cycle = [...path];
-          const sortedCycle = cycle.slice().sort();
+          const sortedCycle = [...path].sort();
           const cycleKey = sortedCycle.join('|');
           if (!cycles.some(c => c.key === cycleKey)) {
-            cycles.push({ key: cycleKey, path: cycle });
+            cycles.push({ key: cycleKey, path: [...path] });
           }
           continue;
         }
         if (!path.includes(neighbor)) {
-          findNewCycles([...path, neighbor]);
+          findCycles([...path, neighbor]);
         }
       }
     }
 
     for (const startNode of adj.keys()) {
-      findNewCycles([startNode]);
+      findCycles([startNode]);
     }
 
-    // 3. Convertir les cycles en nœuds 'room'
+    // 3. Convertir en pièces
     const roomNodes = cycles.map(cycle => {
-      const cyclePoints = cycle.path.map(key => {
-        const [x, y] = key.split(',').map(Number);
-        return { x, y };
-      });
-      
+      const cyclePoints = cycle.path.map(key => points.get(key));
+
       const minX = Math.min(...cyclePoints.map(p => p.x));
       const minY = Math.min(...cyclePoints.map(p => p.y));
       const maxX = Math.max(...cyclePoints.map(p => p.x));
@@ -76,15 +92,14 @@ export const useRoomDetector = (wallNodes) => {
         id: getRoomId(cyclePoints),
         type: 'room',
         position: { x: minX, y: minY },
-        data: { label: 'Pièce', color: '#009688' },
+        data: { label: 'Pièce', color: '#009688', polygon: cyclePoints }, // On sauvegarde le polygone pour le futur !
         style: { width, height, zIndex: -1 },
-        draggable: false,
+        draggable: false, // On ne déplace pas une pièce directement comme ça
         selectable: true,
       };
-    }).filter(room => room.style.width > 0 && room.style.height > 0);
+    }).filter(room => room.style.width > 10 && room.style.height > 10);
 
     return roomNodes;
-
   }, [wallNodes]);
 
   return detectedRooms;

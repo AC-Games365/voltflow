@@ -1,62 +1,95 @@
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { NodeResizer } from 'reactflow';
 
 const RoomNode = ({ data, selected, width, height }) => {
-  const w = Math.round(width || 200);
-  const h = Math.round(height || 200);
+  const w = Math.max(Math.round(width || 200), 50);
+  const h = Math.max(Math.round(height || 200), 50);
 
-    const shouldDisplayDimensions = true
+  // Analyse du polygone fourni par le useRoomDetector
+  const { pointsString, areaM2, isPolygon } = useMemo(() => {
+    const poly = data?.polygon;
+    if (!poly || poly.length < 3) return { isPolygon: false };
 
+    // 1. Convertir les coordonnées absolues (du plan) en coordonnées relatives (pour le SVG)
+    const minX = Math.min(...poly.map(p => p.x));
+    const minY = Math.min(...poly.map(p => p.y));
+    const pts = poly.map(p => `${p.x - minX},${p.y - minY}`).join(' ');
+
+    // 2. Calculer l'aire exacte du polygone avec la formule de Gauss (Shoelace formula)
+    let sum = 0;
+    for (let i = 0; i < poly.length; i++) {
+      const p1 = poly[i];
+      const p2 = poly[(i + 1) % poly.length];
+      sum += (p1.x * p2.y) - (p2.x * p1.y);
+    }
+
+    // Nos dimensions sont en cm, donc l'aire est en cm². On divise par 10000 pour les m².
+    const areaCm2 = Math.abs(sum) / 2;
+    const aM2 = (areaCm2 / 10000).toFixed(2);
+
+    return { pointsString: pts, areaM2: aM2, isPolygon: true };
+  }, [data?.polygon]);
 
   return (
-    <>
-      <NodeResizer color="#009688" isVisible={selected} minWidth={50} minHeight={50} />
-      <div style={{ width: `${w}px`, height: `${h}px`, position: 'relative' }}>
-        {/* Arrière-plan semi-transparent de la pièce */}
-        <div style={{ 
-          position: 'absolute', inset: 0,
-          backgroundColor: data?.color || '#009688', 
-          opacity: 0.3,
-          border: '2px dashed #009688',
-          borderRadius: '4px',
-        }} />
-        
-        {/* Texte du nom de la pièce */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '18px',
-          fontWeight: 'bold',
-          color: '#333',
-          textAlign: 'center'
-        }}>
-          {data?.label}
-        </div>
-
-        {/* Lignes de cote (Dimensions) */}
-        {shouldDisplayDimensions && w > 60 && h > 60 && (
-          <svg className="room-dimensions" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-            <defs>
-              <marker id="arrow-dim" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
-                <path d="M0,1 L0,7 L8,4 z" fill="#555" />
-              </marker>
-              <marker id="arrow-dim-rev" markerWidth="8" markerHeight="8" refX="1" refY="4" orient="auto" markerUnits="strokeWidth">
-                <path d="M8,1 L8,7 L0,4 z" fill="#555" />
-              </marker>
-            </defs>
-            {/* Horizontal dimension (bottom) */}
-            <line x1="8" y1={h - 15} x2={w - 8} y2={h - 15} stroke="#555" strokeWidth="1" markerEnd="url(#arrow-dim)" markerStart="url(#arrow-dim-rev)" />
-            <text x={w / 2} y={h - 20} fill="#555" fontSize="10" fontWeight="bold" textAnchor="middle">{w} cm</text>
-            
-            {/* Vertical dimension (right) */}
-            <line x1={w - 15} y1="8" x2={w - 15} y2={h - 8} stroke="#555" strokeWidth="1" markerEnd="url(#arrow-dim)" markerStart="url(#arrow-dim-rev)" />
-            <text x={w - 20} y={h / 2} fill="#555" fontSize="10" fontWeight="bold" textAnchor="middle" transform={`rotate(-90 ${w - 20} ${h / 2})`}>{h} cm</text>
-          </svg>
+      <>
+        {/* On ne garde le Resizer que si ce n'est pas un polygone généré automatiquement */}
+        {!isPolygon && (
+            <NodeResizer color="#009688" isVisible={selected} minWidth={50} minHeight={50} />
         )}
-      </div>
-    </>
+
+        <div style={{ width: `${w}px`, height: `${h}px`, position: 'relative' }}>
+
+          {/* Le fond de la pièce : Un SVG qui épouse la forme parfaite ! */}
+          <svg
+              style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
+              width={w}
+              height={h}
+          >
+            {isPolygon ? (
+                <polygon
+                    points={pointsString}
+                    fill={data?.color || '#009688'}
+                    fillOpacity={0.2}
+                    stroke={selected ? '#009688' : 'transparent'}
+                    strokeWidth="2"
+                    strokeDasharray="4 4"
+                />
+            ) : (
+                /* Fallback au cas où ce serait une pièce dessinée manuellement (rectangle classique) */
+                <rect
+                    width={w}
+                    height={h}
+                    fill={data?.color || '#009688'}
+                    fillOpacity={0.2}
+                    stroke={selected ? '#009688' : 'transparent'}
+                    strokeWidth="2"
+                    strokeDasharray="4 4"
+                    rx="4"
+                />
+            )}
+          </svg>
+
+          {/* Informations de la pièce (Nom + Surface en m²) centrées */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#2D3748',
+            pointerEvents: 'none', // Pour ne pas gêner les clics sur les murs en dessous
+          }}>
+          <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
+            {data?.label || 'Pièce'}
+          </span>
+            {isPolygon && (
+                <span style={{ fontSize: '14px', marginTop: '4px', backgroundColor: 'rgba(255,255,255,0.7)', padding: '2px 6px', borderRadius: '4px' }}>
+              {areaM2} m²
+            </span>
+            )}
+          </div>
+        </div>
+      </>
   );
 };
 
